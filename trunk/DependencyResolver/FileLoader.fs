@@ -108,7 +108,7 @@ let DependencyCompare allScripts script1 script2 =
 
 let loadScript spec =
     let fileText = File.ReadAllText(spec.Path, Encoding.Default)
-    let parts = fileText.Split([|"//@UNDO"|], StringSplitOptions.None)
+    let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
     (parts.[0], parts.[1])
 
 
@@ -125,7 +125,11 @@ open System.Data.Common
 let executeSql (script : string) =
     use conn = new SqlConnection(@"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;")
     conn.Open()
-    for statement in script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries) do
+    let statements =
+        script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map (fun s -> s.Trim())
+        |> Array.filter (fun s -> not (String.IsNullOrWhiteSpace s))
+    for statement in statements do
         Console.WriteLine statement |> ignore
         Console.WriteLine "GO" |> ignore
         Console.WriteLine() |> ignore
