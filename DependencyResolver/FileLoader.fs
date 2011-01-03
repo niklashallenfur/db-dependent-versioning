@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Text.RegularExpressions
+open System.Text
 
 
 type ScriptName =
@@ -94,7 +95,7 @@ let DependencyNameList allScripts scriptName =
     let rec dnl scriptName dependencies =
         let script = findScript scriptName
         let currentBuilt = (scriptName::dependencies)
-        match script.DependentOn with            
+        match script.DependentOn with
             |None -> currentBuilt
             |Some(dependentName) -> dnl dependentName currentBuilt
     dnl scriptName []
@@ -106,7 +107,7 @@ let DependencyCompare allScripts script1 script2 =
     if dependencyChain1 < dependencyChain2 then -1 else 1
 
 let loadScript spec =
-    let fileText = File.ReadAllText(spec.Path)
+    let fileText = File.ReadAllText(spec.Path, Encoding.Default)
     let parts = fileText.Split([|"//@UNDO"|], StringSplitOptions.None)
     (parts.[0], parts.[1])
 
@@ -121,17 +122,19 @@ open System.Data.SqlServerCe
 open System.Data.SqlClient
 open System.Data.Common
 
-let executeSql script =
-    use conn = new SqlCeConnection(@"Data Source= D:\Proj\DbVersioning\DependencyResolver\bin\Debug\TestDb.sdf;Persist Security Info=False;")
+let executeSql (script : string) =
+    use conn = new SqlConnection(@"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;")
     conn.Open()
-    use command = new SqlCeCommand(script, conn)
-    command.ExecuteNonQuery() |> ignore
+    for statement in script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries) do
+        Console.WriteLine statement |> ignore
+        Console.WriteLine "GO" |> ignore
+        Console.WriteLine() |> ignore
+        use command = new SqlCommand(statement, conn)
+        command.ExecuteNonQuery() |> ignore
         
-
-let baseDir = @"D:\Proj\DbVersioning\DbScripts"
-let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray
+let baseDir = @"D:\Proj\db-versioning\DbScripts"
+let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
 let modules = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
-
 
 let scripts = modules
 let nameSorted = List.sort scripts
