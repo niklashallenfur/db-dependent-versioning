@@ -40,6 +40,10 @@
     <Compile Include="Test.fs" />
     <Compile Include="Program.fs" />
     <Compile Include="FileLoader.fs" />
+    <Content Include="..\Console\TestDb.mdf">
+      <Link>TestDb.mdf</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
