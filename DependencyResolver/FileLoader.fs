@@ -111,11 +111,11 @@ let loadScript spec =
     let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
     (parts.[0], parts.[1])
 
-
-let executeScript scriptExecuter (spec : DbScriptSpec) = 
+let executeScript scriptExecuter scriptChooser (spec : DbScriptSpec) = 
     let (script, undoScript) = loadScript spec
+    let toExecute = scriptChooser (script, undoScript)
     Console.WriteLine (sprintf "Executing %s" (spec.Name.ToString()))
-    scriptExecuter script
+    scriptExecuter toExecute
     Console.WriteLine()
 
 open System.Data.SqlServerCe
@@ -135,7 +135,14 @@ let executeSql (script : string) =
         Console.WriteLine() |> ignore
         use command = new SqlCommand(statement, conn)
         command.ExecuteNonQuery() |> ignore
-        
+
+let registerCreated sqlExecuter (script : DbScriptSpec) =
+        let dependency = match script.DependentOn with
+                            | None -> "NULL"
+                            | Some(name) -> sprintf "'%s'" (name.ToString())        
+        let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss.nnn"))
+        sqlExecuter registerScript
+
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
 let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
 let modules = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
@@ -147,7 +154,13 @@ let dependent = TransformToItemDependent nameSorted
 
 let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
 
-dependencySorted |> List.map (executeScript executeSql) |> ignore
+let executeAndRegister scriptSpec =
+    let fns = [executeScript executeSql fst; registerCreated executeSql]
+    List.map (fun f -> f(scriptSpec)) fns
+
+
+dependencySorted |> List.map (fun s -> executeAndRegister s) |> ignore
+dependencySorted |> List.rev |> List.map (executeScript executeSql snd) |> ignore
 
 Console.ReadKey() |> ignore
 
