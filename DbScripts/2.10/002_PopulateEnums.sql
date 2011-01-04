@@ -1,8 +1,8 @@
-INSERT INTO EventType VALUES (1, "Snubblade")
-INSERT INTO EventType VALUES (2, "Blev rånad")
-INSERT INTO EventType VALUES (3, "Åt middag")
-INSERT INTO EventType VALUES (4, "Krockade bilen")
-INSERT INTO EventType VALUES (5, "Bensinstopp")
+INSERT INTO EventType(id, name) VALUES (1, 'Snubblade')
+INSERT INTO EventType(id, name) VALUES (2, 'Blev rånad')
+INSERT INTO EventType(id, name) VALUES (3, 'Åt middag')
+INSERT INTO EventType(id, name) VALUES (4, 'Krockade bilen')
+INSERT INTO EventType(id, name) VALUES (5, 'Bensinstopp')
 
 --//@UNDO
 
