@@ -13,4 +13,4 @@ GO
 	
 --//@UNDO
 
-DROP TABLE EventType
+DROP TABLE ActualEvent
