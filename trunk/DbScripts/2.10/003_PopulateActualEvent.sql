@@ -1,5 +1,5 @@
 --//@DEPENDSON = 2.11.2
-INSERT INTO ActualEvent VALUES (1, "Niklas bröt benet", 1)
+INSERT INTO ActualEvent(id, name, eventTypeId) VALUES (1, 'Niklas bröt benet', 1)
 
 --//@UNDO
 
