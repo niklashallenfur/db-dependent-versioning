@@ -1,45 +1,14 @@
 ﻿module FileLoader
 
+
+open Diffluxum.DbVersioning.Types
+open Diffluxum.DbVersioning.DbScriptRepository
+open Diffluxum.DbVersioning.SqlServerSpecific
+
 open System
 open System.IO
 open System.Text.RegularExpressions
 open System.Text
-open Diffluxum.DbVersioning.Types
-open Diffluxum.DbVersioning.SqlServerSpecific
-
-let dependsOnRegex = @"\s*--\s*//@DEPENDSON\s*=\s*(?<dependsOnScript>[\d\.]+)\s*"
-
-let getScriptDependency moduleFile =    
-    let firstLine =
-        use file = File.OpenText(moduleFile)
-        file.ReadLine()
-    let rm = Regex.Match(firstLine, dependsOnRegex)
-    match rm.Success with
-    | false -> None 
-    | true -> Some(ScriptName.Parse(rm.Groups.Item("dependsOnScript").Value))
-
-let getModuleScript moduleName moduleFile =
-    let fileName = Path.GetFileNameWithoutExtension(moduleFile)
-    let indexOfSeparator = fileName.IndexOf('_')
-    let (fileNumber, description) =
-        if indexOfSeparator > 0 then
-            (fileName.Substring(0, indexOfSeparator) |> Int32.Parse,
-             fileName.Substring(indexOfSeparator + 1))
-        else
-            (fileName |> Int32.Parse, "")
-    let scriptName = {Module = moduleName; Number = fileNumber}
-    {   Name = scriptName;
-        Description = description;
-        Path = moduleFile;
-        DependentOn = getScriptDependency(moduleFile)}
-
-let getModule moduleDir =
-    let moduleNameUnparsed = Path.GetFileName(moduleDir)
-    let moduleNameParts = moduleNameUnparsed.Split('.')
-    let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray
-    let moduleFiles = Directory.GetFiles(moduleDir)
-    let moduleScripts = moduleFiles |> List.ofArray |> List.map (getModuleScript moduleName)
-    (moduleName, moduleScripts)
     
 let TransformToItemDependent items =
     let rec innerTransformToItemDependent (previous:ScriptName option) items =
@@ -86,40 +55,34 @@ let executeScript scriptExecuter scriptChooser (spec : DbScriptSpec) =
 
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
+let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
 
 
+let program() =
+    let scripts = readAvailableScripts baseDir
+    let nameSorted = List.sort scripts
 
-let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
-let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
-let nameSorted = List.sort scripts
-let dependent = TransformToItemDependent nameSorted
-let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
+    let dependent = TransformToItemDependent nameSorted
+    let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
+
+    use connection = connectionCreator.CreateConnection()
+    let alreadyExecuted = connection.GetAlreadyExecuted()
+    let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
+
+    let executeAndRegister scriptSpec =
+        let fns = [executeScript connection.ExecuteScript fst; registerCreated connection.ExecuteScript]
+        List.map (fun f -> f(scriptSpec)) fns
+
+    let undoAndUnRegister scriptSpec =
+        let fns = [unRegisterCreated connection.ExecuteScript; executeScript connection.ExecuteScript snd]
+        List.map (fun f -> f(scriptSpec)) fns
+
+    scriptsToExecute |> List.map (fun s -> executeAndRegister s) |> ignore
+    //scriptsToExecute |> List.rev |> List.map (fun s -> undoAndUnRegister s) |> ignore
+
+    connection.Commit()
 
 
-
-let connectionCreater = SqlConnectionFactory(connString) :> IConnectionResourceProvider
-
-let connection = connectionCreater.CreateConnection()
-
-let executeAndRegister scriptSpec =
-    let fns = [executeScript connection.ExecuteScript fst; registerCreated connection.ExecuteScript]
-    List.map (fun f -> f(scriptSpec)) fns
-
-let undoAndUnRegister scriptSpec =
-    let fns = [unRegisterCreated connection.ExecuteScript; executeScript connection.ExecuteScript snd]
-    List.map (fun f -> f(scriptSpec)) fns
-
-let alreadyExecuted = connection.GetAlreadyExecuted()
-let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
-
-scriptsToExecute |> List.map (fun s -> executeAndRegister s) |> ignore
-
-dependencySorted |> List.rev |> List.map (fun s -> undoAndUnRegister s) |> ignore
-
-connection.Commit()
-connection.Dispose()
-
+program()
 Console.ReadKey() |> ignore
-
-
 
