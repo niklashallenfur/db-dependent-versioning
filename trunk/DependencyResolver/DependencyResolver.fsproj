@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="Test.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="DbScriptRepository.fs" />
     <Compile Include="SqlServerSpecific.fs" />
     <Compile Include="FileLoader.fs" />
     <Content Include="..\Console\TestDb.mdf">

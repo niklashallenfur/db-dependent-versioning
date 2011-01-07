@@ -42,3 +42,7 @@ type IConnectionResource =
 
 type IConnectionResourceProvider =
     abstract CreateConnection : unit -> IConnectionResource
+
+type IScriptRepository =
+    abstract GetAvailableScripts : unit -> seq<DbScriptSpec>
+

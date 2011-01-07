@@ -54,5 +54,3 @@ let createSqlConnection connStr =
 type SqlConnectionFactory (connStr) = 
     interface IConnectionResourceProvider with
         member this.CreateConnection() = createSqlConnection connStr
-
-let sqlConnectionCreator = {new IConnectionResourceProvider with member this.CreateConnection() = createSqlConnection}
