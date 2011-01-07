@@ -38,11 +38,12 @@
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <ItemGroup>
     <Compile Include="Test.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="SqlServerSpecific.fs" />
     <Compile Include="FileLoader.fs" />
     <Content Include="..\Console\TestDb.mdf">
       <Link>TestDb.mdf</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="0_CreateDbVersionHistory.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -57,7 +58,9 @@
     <Reference Include="System.Data.SqlServerCe, Version=3.5.1.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Transactions" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
