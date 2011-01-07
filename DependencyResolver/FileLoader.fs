@@ -4,41 +4,8 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 open System.Text
-
-
-type ScriptName =
-    {
-        Module : int list
-        Number : int;
-    }
-    override x.ToString() =
-        let rec dotify (ints: int seq) =
-            let ints = List.ofSeq ints
-            match ints with
-            |[] -> ""
-            |subv::tail -> sprintf "%i.%s" subv (dotify tail)
-        sprintf "%s%i" (dotify x.Module) x.Number
-
-type DbScriptSpec = 
-    {
-        Name : ScriptName; 
-        Path : string;
-        Description : string;
-        DependentOn : ScriptName option
-    }
-    override x.ToString() =
-        let dependenyString =
-            match x.DependentOn with
-            | None -> ""
-            | Some(name) -> sprintf " ->%s" (name.ToString())
-        sprintf "%s: %s%s" (x.Name.ToString()) x.Path dependenyString
-
-let parseScriptName (name : string) =
-    let nameParts = name.Split('.') |> List.ofArray |> List.map Int32.Parse
-    let rev = nameParts |> List.rev
-    let number = rev.Head
-    let moduleName = rev.Tail |> List.rev
-    {Module = moduleName; Number = number}
+open Diffluxum.DbVersioning.Types
+open Diffluxum.DbVersioning.SqlServerSpecific
 
 let dependsOnRegex = @"\s*--\s*//@DEPENDSON\s*=\s*(?<dependsOnScript>[\d\.]+)\s*"
 
@@ -49,7 +16,7 @@ let getScriptDependency moduleFile =
     let rm = Regex.Match(firstLine, dependsOnRegex)
     match rm.Success with
     | false -> None 
-    | true -> Some(parseScriptName (rm.Groups.Item("dependsOnScript").Value))
+    | true -> Some(ScriptName.Parse(rm.Groups.Item("dependsOnScript").Value))
 
 let getModuleScript moduleName moduleFile =
     let fileName = Path.GetFileNameWithoutExtension(moduleFile)
@@ -89,7 +56,6 @@ let TransformToItemDependent items =
                 | _ -> scriptSpec::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
     innerTransformToItemDependent None items
 
-
 let DependencyNameList allScripts scriptName =
     let findScript name = List.find (fun x -> x.Name = name) allScripts
     let rec dnl scriptName dependencies =
@@ -113,54 +79,44 @@ let loadScript spec =
 
 let executeScript scriptExecuter scriptChooser (spec : DbScriptSpec) = 
     let (script, undoScript) = loadScript spec
-    let toExecute = scriptChooser (script, undoScript)
+    let toExecute : string = scriptChooser (script, undoScript)
     Console.WriteLine (sprintf "Executing %s" (spec.Name.ToString()))
     scriptExecuter toExecute
     Console.WriteLine()
 
-open System.Data.SqlServerCe
-open System.Data.SqlClient
-open System.Data.Common
+open System.Transactions
 
-let executeSql (script : string) =
-    use conn = new SqlConnection(@"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;")
-    conn.Open()
-    let statements =
-        script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun s -> s.Trim())
-        |> Array.filter (fun s -> not (String.IsNullOrWhiteSpace s))
-    for statement in statements do
-        Console.WriteLine statement |> ignore
-        Console.WriteLine "GO" |> ignore
-        Console.WriteLine() |> ignore
-        use command = new SqlCommand(statement, conn)
-        command.ExecuteNonQuery() |> ignore
-
-let registerCreated sqlExecuter (script : DbScriptSpec) =
-        let dependency = match script.DependentOn with
-                            | None -> "NULL"
-                            | Some(name) -> sprintf "'%s'" (name.ToString())        
-        let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss.nnn"))
-        sqlExecuter registerScript
+let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
-let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
-let modules = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
 
-let scripts = modules
+let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
+let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
+
 let nameSorted = List.sort scripts
 
 let dependent = TransformToItemDependent nameSorted
-
 let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
 
+let connection = createSqlConnection connString
+
 let executeAndRegister scriptSpec =
-    let fns = [executeScript executeSql fst; registerCreated executeSql]
+    let fns = [executeScript connection.ExecuteScript fst; registerCreated connection.ExecuteScript]
     List.map (fun f -> f(scriptSpec)) fns
 
+let undoAndUnRegister scriptSpec =
+    let fns = [unRegisterCreated connection.ExecuteScript; executeScript connection.ExecuteScript snd]
+    List.map (fun f -> f(scriptSpec)) fns
 
-dependencySorted |> List.map (fun s -> executeAndRegister s) |> ignore
-dependencySorted |> List.rev |> List.map (executeScript executeSql snd) |> ignore
+let alreadyExecuted = connection.GetAlreadyExecuted()
+let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
+
+scriptsToExecute |> List.map (fun s -> executeAndRegister s) |> ignore
+
+dependencySorted |> List.rev |> List.map (fun s -> undoAndUnRegister s) |> ignore
+
+connection.Commit()
+connection.Dispose()
 
 Console.ReadKey() |> ignore
 
