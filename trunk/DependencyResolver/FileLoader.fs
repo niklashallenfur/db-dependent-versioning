@@ -84,21 +84,22 @@ let executeScript scriptExecuter scriptChooser (spec : DbScriptSpec) =
     scriptExecuter toExecute
     Console.WriteLine()
 
-open System.Transactions
-
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
-
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
+
+
 
 let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
 let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
-
 let nameSorted = List.sort scripts
-
 let dependent = TransformToItemDependent nameSorted
 let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
 
-let connection = createSqlConnection connString
+
+
+let connectionCreater = SqlConnectionFactory(connString) :> IConnectionResourceProvider
+
+let connection = connectionCreater.CreateConnection()
 
 let executeAndRegister scriptSpec =
     let fns = [executeScript connection.ExecuteScript fst; registerCreated connection.ExecuteScript]

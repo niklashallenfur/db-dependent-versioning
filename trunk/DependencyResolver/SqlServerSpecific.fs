@@ -51,3 +51,8 @@ let createSqlConnection connStr =
         member this.Commit() = trans.Commit()
         member this.Dispose() = trans.Dispose()
                                 conn.Dispose()}
+type SqlConnectionFactory (connStr) = 
+    interface IConnectionResourceProvider with
+        member this.CreateConnection() = createSqlConnection connStr
+
+let sqlConnectionCreator = {new IConnectionResourceProvider with member this.CreateConnection() = createSqlConnection}
