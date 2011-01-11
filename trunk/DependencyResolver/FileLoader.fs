@@ -1,6 +1,5 @@
 ﻿module FileLoader
 
-
 open Diffluxum.DbVersioning.Types
 open Diffluxum.DbVersioning.DbScriptRepository
 open Diffluxum.DbVersioning.SqlServerSpecific
@@ -24,6 +23,11 @@ let TransformToItemDependent items =
                     -> {scriptSpec with DependentOn = previous}::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
                 | _ -> scriptSpec::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
     innerTransformToItemDependent None items
+
+let rec ReplaceDependencies previous items =
+    match items with
+    |[] -> []
+    |scriptSpec::tail -> {scriptSpec with DependentOn = previous}::(ReplaceDependencies (Some(scriptSpec.Name)) tail)
 
 let DependencyNameList allScripts scriptName =
     let findScript name = List.find (fun x -> x.Name = name) allScripts
@@ -60,6 +64,11 @@ let undoScript (connection : IConnectionResource) (spec : DbScriptSpec) =
     connection.UnRegisterExecuted spec
     Console.WriteLine()
 
+let lastItem sequence =
+    let folder acc item =
+        Some(item)
+    Seq.fold folder None sequence
+
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
 let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
@@ -67,13 +76,16 @@ let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceP
 let program testUndo =
     let scripts = readAvailableScripts baseDir
     let nameSorted = List.sort scripts
-
+  
     let dependent = TransformToItemDependent nameSorted
     let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
 
     use connection = connectionCreator.CreateConnection()
     let alreadyExecuted = connection.GetAlreadyExecuted()
+    let lastExecuted = lastItem alreadyExecuted
+    
     let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
+    let scriptsToExecute = ReplaceDependencies lastExecuted scriptsToExecute
 
     let apply() = scriptsToExecute |> List.map (fun s -> applyScript connection s) |> ignore
     let undo() = scriptsToExecute |> List.rev |> List.map (fun s -> undoScript connection s) |> ignore
@@ -89,4 +101,3 @@ let program testUndo =
 
 program true
 Console.ReadKey() |> ignore
-
