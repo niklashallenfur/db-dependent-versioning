@@ -72,9 +72,11 @@ let lastItem sequence =
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
 let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
+let scriptRepository = FileScriptRepository(baseDir) :> IScriptRepository
+
 
 let program testUndo =
-    let scripts = readAvailableScripts baseDir
+    let scripts = scriptRepository.GetAvailableScripts() |> List.ofSeq
     let nameSorted = List.sort scripts
   
     let dependent = TransformToItemDependent nameSorted
@@ -97,7 +99,6 @@ let program testUndo =
     if testUndo then testUndoScripts()
 
     connection.Commit()
-
 
 program true
 Console.ReadKey() |> ignore
