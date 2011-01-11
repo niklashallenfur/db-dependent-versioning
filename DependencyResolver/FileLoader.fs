@@ -46,19 +46,25 @@ let loadScript spec =
     let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
     (parts.[0], parts.[1])
 
-let executeScript scriptExecuter scriptChooser (spec : DbScriptSpec) = 
-    let (script, undoScript) = loadScript spec
-    let toExecute : string = scriptChooser (script, undoScript)
-    Console.WriteLine (sprintf "Executing %s" (spec.Name.ToString()))
-    scriptExecuter toExecute
+let applyScript (connection : IConnectionResource) (spec : DbScriptSpec) =
+    let (script, _) = loadScript spec
+    Console.WriteLine (sprintf "--Applying %s" (spec.Name.ToString()))
+    connection.ExecuteScript script
+    connection.RegisterExecuted spec
+    Console.WriteLine()
+
+let undoScript (connection : IConnectionResource) (spec : DbScriptSpec) =
+    let (_, undoScript) = loadScript spec
+    Console.WriteLine (sprintf "--Undoing %s" (spec.Name.ToString()))
+    connection.ExecuteScript undoScript
+    connection.UnRegisterExecuted spec
     Console.WriteLine()
 
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
 let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
 
-
-let program() =
+let program testUndo =
     let scripts = readAvailableScripts baseDir
     let nameSorted = List.sort scripts
 
@@ -69,20 +75,18 @@ let program() =
     let alreadyExecuted = connection.GetAlreadyExecuted()
     let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
 
-    let executeAndRegister scriptSpec =
-        let fns = [executeScript connection.ExecuteScript fst; registerCreated connection.ExecuteScript]
-        List.map (fun f -> f(scriptSpec)) fns
+    let apply() = scriptsToExecute |> List.map (fun s -> applyScript connection s) |> ignore
+    let undo() = scriptsToExecute |> List.rev |> List.map (fun s -> undoScript connection s) |> ignore
+    let testUndoScripts() =
+        undo()
+        apply()
 
-    let undoAndUnRegister scriptSpec =
-        let fns = [unRegisterCreated connection.ExecuteScript; executeScript connection.ExecuteScript snd]
-        List.map (fun f -> f(scriptSpec)) fns
-
-    scriptsToExecute |> List.map (fun s -> executeAndRegister s) |> ignore
-    //scriptsToExecute |> List.rev |> List.map (fun s -> undoAndUnRegister s) |> ignore
+    apply()
+    if testUndo then testUndoScripts()
 
     connection.Commit()
 
 
-program()
+program true
 Console.ReadKey() |> ignore
 
