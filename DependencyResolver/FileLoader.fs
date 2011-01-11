@@ -69,10 +69,13 @@ let lastItem sequence =
         Some(item)
     Seq.fold folder None sequence
 
+let moduleDirRegex = @".*(?<moduleName>[\d\.]+).*"
+let moduleNameSeparator = '.'
+
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 let baseDir = @"D:\Proj\db-versioning\DbScripts"
 let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
-let scriptRepository = FileScriptRepository(baseDir) :> IScriptRepository
+let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
 
 
 let program testUndo =
