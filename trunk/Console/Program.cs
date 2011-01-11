@@ -10,10 +10,6 @@ namespace Consoles
     {
         static void Main(string[] args)
         {
-            
-
-            Test.Dummy dummy = new Test.Dummy("Olle");
-            Console.WriteLine(dummy.ToMessage());
             Console.ReadKey();
         }
     }
