@@ -35,14 +35,15 @@ type DbScriptSpec =
         sprintf "%s: %s%s" (x.Name.ToString()) x.Path dependenyString
 
 type IConnectionResource =
-    inherit IDisposable
-    abstract GetAlreadyExecuted : unit -> seq<ScriptName>
+    inherit IDisposable    
     abstract ExecuteScript : string -> unit
     abstract Commit : unit -> unit
+    abstract GetAlreadyExecuted : unit -> seq<ScriptName>
+    abstract RegisterExecuted : DbScriptSpec -> unit
+    abstract UnRegisterExecuted : DbScriptSpec -> unit
 
 type IConnectionResourceProvider =
     abstract CreateConnection : unit -> IConnectionResource
 
 type IScriptRepository =
     abstract GetAvailableScripts : unit -> seq<DbScriptSpec>
-

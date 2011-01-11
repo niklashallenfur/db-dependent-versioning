@@ -3,6 +3,7 @@
 open System
 open System.Data.SqlClient
 open Diffluxum.DbVersioning.Types
+open Diffluxum.DbVersioning.Resources
 
 let executeSql createCommand (script : string) =
     let statements =
@@ -16,26 +17,30 @@ let executeSql createCommand (script : string) =
         use command : SqlCommand = createCommand statement
         command.ExecuteNonQuery() |> ignore
 
-let getAlreadyExecuted createCommand =    
+let assertVersioningTableExists createCommand =
     let versioningTables = use command : SqlCommand = createCommand "SELECT COUNT(*) FROM sys.objects o WHERE o.name ='DbVersioningHistory' AND o.type ='U'"
                            command.ExecuteScalar() :?> int
     match versioningTables with
-        |0 -> []
-        |1 ->   use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
-                use reader = command.ExecuteReader()    
-                seq {  while reader.Read() do
-                        yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
-                    |> List.ofSeq
-        |x -> failwith (sprintf "Strange number of DbVersioningHistory tables in db: %i" x)       
+    |0 ->   executeSql createCommand SqlResources.CreateDbVersionHistory
+    |1 ->   ignore 0
+    |x -> failwith (sprintf "Strange number of DbVersioningHistory tables in db: %i" x)
+    
+let getAlreadyExecuted createCommand =    
+        assertVersioningTableExists createCommand
+        use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
+        use reader = command.ExecuteReader()    
+        seq {  while reader.Read() do
+                yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
+            |> List.ofSeq        
 
 let registerCreated sqlExecuter (script : DbScriptSpec) : unit =
         let dependency = match script.DependentOn with
                             | None -> "NULL"
                             | Some(name) -> sprintf "'%s'" (name.ToString())        
-        let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss"))
+        let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss.fff"))
         sqlExecuter registerScript
 
-let unRegisterCreated sqlExecuter (script : DbScriptSpec) =        
+let unRegisterCreated sqlExecuter (script : DbScriptSpec) =                
         let unregisterScript = sprintf "DELETE FROM DbVersioningHistory WHERE ScriptVersion='%s'" (script.Name.ToString())
         sqlExecuter unregisterScript
 
@@ -44,13 +49,16 @@ let createSqlConnection connStr =
     let trans = conn.Open() 
                 conn.BeginTransaction(Data.IsolationLevel.Serializable)
     let createCommand commandText = new SqlCommand(commandText, conn, trans)
-
+    let sqlExecuter = executeSql createCommand
     {new IConnectionResource with        
         member this.GetAlreadyExecuted() = getAlreadyExecuted createCommand :> seq<ScriptName>
-        member this.ExecuteScript(string) = executeSql createCommand string
-        member this.Commit() = trans.Commit()
+        member this.ExecuteScript(toExecute) = sqlExecuter toExecute
+        member this.RegisterExecuted(scriptSpec) = registerCreated sqlExecuter scriptSpec
+        member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec
+        member this.Commit() = trans.Commit()        
         member this.Dispose() = trans.Dispose()
                                 conn.Dispose()}
+
 type SqlConnectionFactory (connStr) = 
     interface IConnectionResourceProvider with
         member this.CreateConnection() = createSqlConnection connStr
