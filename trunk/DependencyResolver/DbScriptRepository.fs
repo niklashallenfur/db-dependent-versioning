@@ -48,7 +48,14 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
         (moduleName, moduleScripts)
 
     let readAvailableScripts baseDir =
-        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName ->   int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0)//&& Regex.IsMatch(Path.GetFileName(dirName), moduleDirRegex))
+        let ignoreFolder =
+            let ignoreFile = Path.Combine(baseDir, "IgnoreFolders.txt")
+            match File.Exists(ignoreFile) with
+            |false ->   fun x -> true
+            |true ->    let ignored = File.ReadAllLines(ignoreFile) |> List.ofArray |> List.map (fun dir -> dir.Trim()) |> List.filter (fun x -> not (String.IsNullOrEmpty(x)))
+                        fun folderPath -> List.exists (fun x -> x = Path.GetFileName(folderPath)) ignored
+            
+        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName ->   int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0 && not(ignoreFolder dirName))//&& Regex.IsMatch(Path.GetFileName(dirName), moduleDirRegex))
         let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
         scripts
 
