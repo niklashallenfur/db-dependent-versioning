@@ -45,3 +45,6 @@ let readAvailableScripts baseDir =
     let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
     scripts
 
+type FileScriptRepository (baseDir) = 
+    interface IScriptRepository with
+        member this.GetAvailableScripts() = Seq.ofList (readAvailableScripts baseDir)
