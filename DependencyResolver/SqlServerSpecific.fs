@@ -23,16 +23,19 @@ type SqlConnectionFactory (connStr) =
                                command.ExecuteScalar() :?> int
         match versioningTables with
         |0 ->   executeSql createCommand SqlResources.CreateDbVersionHistory
-        |1 ->   ignore 0
+                false
+        |1 ->   true
         |x -> failwith (sprintf "Strange number of DbVersioningHistory tables in db: %i" x)
     
     let getAlreadyExecuted createCommand =    
-            assertVersioningTableExists createCommand
-            use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
-            use reader = command.ExecuteReader()    
-            seq {  while reader.Read() do
-                    yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
-                |> List.ofSeq        
+            match assertVersioningTableExists createCommand with
+            |false -> []
+            |true ->
+                use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
+                use reader = command.ExecuteReader()    
+                seq {  while reader.Read() do
+                        yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
+                    |> List.ofSeq        
 
     let registerCreated sqlExecuter (script : DbScriptSpec) : unit =
             let dependency = match script.DependentOn with
@@ -46,7 +49,7 @@ type SqlConnectionFactory (connStr) =
             sqlExecuter unregisterScript
 
     let createSqlConnection connStr = 
-        let conn = new SqlConnection(connStr)    
+        let conn = new SqlConnection(connStr)
         let trans = conn.Open() 
                     conn.BeginTransaction(Data.IsolationLevel.Serializable)
         let createCommand commandText = new SqlCommand(commandText, conn, trans)
