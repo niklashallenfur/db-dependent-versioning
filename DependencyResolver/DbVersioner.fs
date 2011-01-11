@@ -95,7 +95,7 @@ type DbVersioner(connString, baseDir, moduleDirRegex, moduleNameSeparator) =
 
         connection.Commit()
 
-type DbVersionerTask() =
+type SyncDatabase() =
     inherit Task()
 
     let mutable connStr = ""

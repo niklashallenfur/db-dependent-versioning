@@ -42,15 +42,13 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
                 moduleName
 
     let getModule moduleDir =
-        let moduleNameUnparsed = Path.GetFileName(moduleDir)
-        let moduleNameParts = moduleNameUnparsed.Split('.')
-        let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray
-        let moduleFiles = Directory.GetFiles(moduleDir)
+        let moduleName = getModuleName (Path.GetFileName(moduleDir))
+        let moduleFiles = Directory.GetFiles(moduleDir,"*.sql")
         let moduleScripts = moduleFiles |> List.ofArray |> List.map (getModuleScript moduleName)
         (moduleName, moduleScripts)
 
     let readAvailableScripts baseDir =
-        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0) 
+        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName ->   int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0)//&& Regex.IsMatch(Path.GetFileName(dirName), moduleDirRegex))
         let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
         scripts
 

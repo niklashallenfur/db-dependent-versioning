@@ -8,7 +8,7 @@
     <ProjectGuid>{3095f3ef-cc51-45ad-af54-c5898e5c227a}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>DependencyResolver</RootNamespace>
-    <AssemblyName>DependencyResolver</AssemblyName>
+    <AssemblyName>DbVersioner</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
@@ -48,9 +48,6 @@
       <Link>TestDb.mdf</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <None Include="App.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Build.Framework" />
