@@ -34,6 +34,11 @@ type DbScriptSpec =
             | Some(name) -> sprintf " ->%s" (name.ToString())
         sprintf "%s: %s%s" (x.Name.ToString()) x.Path dependenyString
 
+type ApplyUndoScript = {
+    ApplyScript : string;
+    UndoScript : string;
+    }
+
 type IConnectionResource =
     inherit IDisposable    
     abstract ExecuteScript : string -> unit
@@ -47,3 +52,4 @@ type IConnectionResourceProvider =
 
 type IScriptRepository =
     abstract GetAvailableScripts : unit -> seq<DbScriptSpec>
+    abstract LoadScript : DbScriptSpec -> ApplyUndoScript

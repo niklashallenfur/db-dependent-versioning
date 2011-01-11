@@ -1,4 +1,4 @@
-﻿module Diffluxum.DbVersioning.DbScriptRepository
+﻿namespace Diffluxum.DbVersioning.DbScriptRepository
 
 open System
 open System.IO
@@ -54,5 +54,11 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
         let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
         scripts
 
+    let loadScript spec =
+        let fileText = File.ReadAllText(spec.Path, Encoding.Default)
+        let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
+        {ApplyScript = parts.[0]; UndoScript = parts.[1]}
+
     interface IScriptRepository with
         member this.GetAvailableScripts() = Seq.ofList (readAvailableScripts baseDir)
+        member this.LoadScript(spec) = loadScript spec
