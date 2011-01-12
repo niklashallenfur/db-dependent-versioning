@@ -43,6 +43,7 @@
     <Compile Include="DbScriptRepository.fs" />
     <Compile Include="SqlServerSpecific.fs" />
     <Compile Include="DbVersioner.fs" />
+    <Compile Include="SyncDatabase.fs" />
     <Compile Include="FileLoader.fs" />
     <Content Include="TestDb.mdf">
       <Link>TestDb.mdf</Link>

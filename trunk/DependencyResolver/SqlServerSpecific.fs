@@ -5,16 +5,16 @@ open System.Data.SqlClient
 open Diffluxum.DbVersioning.Types
 open Diffluxum.DbVersioning.Resources
 
-type SqlConnectionFactory (connStr) =
+type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option) =
     let executeSql createCommand (script : string) =
         let statements =
             script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries)
             |> Array.map (fun s -> s.Trim())
             |> Array.filter (fun s -> not (String.IsNullOrWhiteSpace s))
         for statement in statements do
-            Console.WriteLine statement |> ignore
-            Console.WriteLine "GO" |> ignore
-            Console.WriteLine() |> ignore
+            logger.LogMessage(statement, LogImportance.Low)
+            logger.LogMessage("GO", LogImportance.Low)
+            logger.LogMessage("", LogImportance.Low)
             use command : SqlCommand = createCommand statement
             command.ExecuteNonQuery() |> ignore
 
@@ -41,7 +41,7 @@ type SqlConnectionFactory (connStr) =
             let dependency = match script.DependentOn with
                                 | None -> "NULL"
                                 | Some(name) -> sprintf "'%s'" (name.ToString())        
-            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss.fff"))
+            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, GETUTCDATE())" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency
             sqlExecuter registerScript
 
     let unRegisterCreated sqlExecuter (script : DbScriptSpec) =                
@@ -53,7 +53,11 @@ type SqlConnectionFactory (connStr) =
         let trans = conn.Open() 
                     conn.BeginTransaction(Data.IsolationLevel.Serializable)
         let createCommand commandText = new SqlCommand(commandText, conn, trans)
-        let sqlExecuter = executeSql createCommand
+        let sqlExecuter =
+            match sqlOutput with
+            | None -> executeSql createCommand
+            | Some(output) -> fun script -> output.LogMessage(script, LogImportance.Low)        
+         
         {new IConnectionResource with        
             member this.GetAlreadyExecuted() = getAlreadyExecuted createCommand :> seq<ScriptName>
             member this.ExecuteScript(toExecute) = sqlExecuter toExecute
