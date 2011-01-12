@@ -54,18 +54,17 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
 
     let applyScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
         let applyUndo = (scriptLoader spec)
-        logger.LogMessage(sprintf "--Applying %s" (spec.Name.ToString()), LogImportance.High)
-        connection.ExecuteScript applyUndo.ApplyScript
-        connection.RegisterExecuted spec
-        logger.LogMessage("", LogImportance.Low)
-        
+        let message = sprintf "Applying %s" (spec.Name.ToString())
+        logger.LogMessage(message, LogImportance.High)
+        connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
+        connection.RegisterExecuted spec        
 
     let undoScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
         let applyUndo = (scriptLoader spec)
-        Console.WriteLine (sprintf "--Undoing %s" (spec.Name.ToString()))
-        connection.ExecuteScript applyUndo.UndoScript
+        let message = sprintf "Undoing %s" (spec.Name.ToString())
+        logger.LogMessage(message, LogImportance.High)
+        connection.ExecuteScript (applyUndo.UndoScript, Some(message))
         connection.UnRegisterExecuted spec
-        Console.WriteLine()
 
     let lastItem sequence =
         let folder acc item =
@@ -88,7 +87,7 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
         let alreadyExecuted = connection.GetAlreadyExecuted()
         let lastExecuted = lastItem alreadyExecuted
 
-        logger.LogMessage(sprintf "Number of already executed scripts: %i" (List.length scripts), LogImportance.Low)
+        logger.LogMessage(sprintf "Number of already executed scripts: %i" (Seq.length alreadyExecuted), LogImportance.Low)
         match lastExecuted with
         |Some(x) -> logger.LogMessage(sprintf "Last executed script is %s" (x.ToString()), LogImportance.Medium)
         |_ -> ignore 0
@@ -101,15 +100,15 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
         let apply() = scriptsToExecute |> List.map (fun s -> applyScript connection scriptRepository.LoadScript s) |> ignore
         let undo() = scriptsToExecute |> List.rev |> List.map (fun s -> undoScript connection scriptRepository.LoadScript s) |> ignore
         let testUndoScripts() =
-            logger.LogMessage("--Undoing scripts", LogImportance.Medium)
+            logger.LogMessage("Undoing scripts", LogImportance.Medium)
             undo()
-            logger.LogMessage("--Re-applying scripts", LogImportance.Medium)
+            logger.LogMessage("Re-applying scripts", LogImportance.Medium)
             apply()
         
-        logger.LogMessage("--Applying scripts", LogImportance.Medium)
+        logger.LogMessage("Applying scripts", LogImportance.Medium)
         apply()
         if testUndo then testUndoScripts()
 
-        logger.LogMessage("--Committing changes", LogImportance.Low)
+        logger.LogMessage("Committing changes", LogImportance.Low)
         connection.Commit()
-        logger.LogMessage("--Done committing changes", LogImportance.Low)
+        logger.LogMessage("Done committing changes", LogImportance.Low)
