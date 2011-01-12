@@ -32,7 +32,7 @@ let consoleLogger = {new ILogger with
               member this.LogError(text) =  use c = tempColor ConsoleColor.Red
                                             Console.WriteLine(text)}
 
-let fileLogger = new FileLogger(@"c:\temp\diffscript.sql")
+let fileLogger = new FileLogger(@"d:\temp\diffscript.sql")
 
 let connectionCreator = SqlConnectionFactory(connString, consoleLogger, Some(fileLogger :> Diffluxum.DbVersioning.Types.ILogger)) :> IConnectionResourceProvider
 let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository

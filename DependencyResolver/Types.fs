@@ -40,8 +40,8 @@ type ApplyUndoScript = {
     }
 
 type IConnectionResource =
-    inherit IDisposable    
-    abstract ExecuteScript : string -> unit
+    inherit IDisposable
+    abstract ExecuteScript : string * string option -> unit
     abstract Commit : unit -> unit
     abstract GetAlreadyExecuted : unit -> seq<ScriptName>
     abstract RegisterExecuted : DbScriptSpec -> unit
