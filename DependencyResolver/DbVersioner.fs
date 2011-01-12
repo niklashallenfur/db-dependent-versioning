@@ -1,20 +1,21 @@
 ﻿namespace Diffluxum.DbVersioning
 
 open Diffluxum.DbVersioning.Types
-open Diffluxum.DbVersioning.DbScriptRepository
-open Diffluxum.DbVersioning.SqlServerSpecific
 
 open System
 open System.IO
-open System.Text.RegularExpressions
 open System.Text
-open Microsoft.Build.Framework
-open Microsoft.Build.Utilities
 
-type DbVersioner(connString, baseDir, moduleDirRegex, moduleNameSeparator) =
-    let connectionCreator = SqlConnectionFactory(connString) :> IConnectionResourceProvider
-    let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
+type FileLogger(file) =
+    let textBuilder = StringBuilder()
+    interface Diffluxum.DbVersioning.Types.ILogger with
+        member this.LogMessage(text, importance) = textBuilder.AppendLine(text) |> ignore
+        member this.LogError(text) = textBuilder.AppendLine(text) |> ignore
 
+    interface IDisposable with
+        member this.Dispose() = File.WriteAllText(file, textBuilder.ToString())
+
+type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptRepository : IScriptRepository, logger : Diffluxum.DbVersioning.Types.ILogger) =
     let TransformToItemDependent items =
         let rec innerTransformToItemDependent (previous:ScriptName option) items =
             match items with
@@ -53,10 +54,11 @@ type DbVersioner(connString, baseDir, moduleDirRegex, moduleNameSeparator) =
 
     let applyScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
         let applyUndo = (scriptLoader spec)
-        Console.WriteLine (sprintf "--Applying %s" (spec.Name.ToString()))
+        logger.LogMessage(sprintf "--Applying %s" (spec.Name.ToString()), LogImportance.High)
         connection.ExecuteScript applyUndo.ApplyScript
         connection.RegisterExecuted spec
-        Console.WriteLine()
+        logger.LogMessage("", LogImportance.Low)
+        
 
     let undoScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
         let applyUndo = (scriptLoader spec)
@@ -71,57 +73,43 @@ type DbVersioner(connString, baseDir, moduleDirRegex, moduleNameSeparator) =
         Seq.fold folder None sequence
 
     member x.ApplyLatestScripts (testUndo) =
+        logger.LogMessage("Getting available scripts ", LogImportance.Low)
         let scripts = scriptRepository.GetAvailableScripts() |> List.ofSeq
+        logger.LogMessage(sprintf "Number of available scripts: %i" (List.length scripts), LogImportance.Low)
+
         let nameSorted = List.sort scripts
   
         let dependent = TransformToItemDependent nameSorted
         let dependencySorted = List.sortWith (DependencyCompare dependent) dependent
-
+        
+        logger.LogMessage("Opening connection", LogImportance.Low)
         use connection = connectionCreator.CreateConnection()
+        logger.LogMessage("Getting already executed scripts", LogImportance.Low)
         let alreadyExecuted = connection.GetAlreadyExecuted()
         let lastExecuted = lastItem alreadyExecuted
+
+        logger.LogMessage(sprintf "Number of already executed scripts: %i" (List.length scripts), LogImportance.Low)
+        match lastExecuted with
+        |Some(x) -> logger.LogMessage(sprintf "Last executed script is %s" (x.ToString()), LogImportance.Medium)
+        |_ -> ignore 0
     
         let scriptsToExecute = dependencySorted |> List.filter (fun script -> not (Seq.exists (fun existingScriptName -> script.Name = existingScriptName) alreadyExecuted))
         let scriptsToExecute = ReplaceDependencies lastExecuted scriptsToExecute
 
+        logger.LogMessage(sprintf "Number of scripts to execute: %i" (List.length scriptsToExecute), LogImportance.Medium)        
+
         let apply() = scriptsToExecute |> List.map (fun s -> applyScript connection scriptRepository.LoadScript s) |> ignore
         let undo() = scriptsToExecute |> List.rev |> List.map (fun s -> undoScript connection scriptRepository.LoadScript s) |> ignore
         let testUndoScripts() =
+            logger.LogMessage("--Undoing scripts", LogImportance.Medium)
             undo()
+            logger.LogMessage("--Re-applying scripts", LogImportance.Medium)
             apply()
-
+        
+        logger.LogMessage("--Applying scripts", LogImportance.Medium)
         apply()
         if testUndo then testUndoScripts()
 
+        logger.LogMessage("--Committing changes", LogImportance.Low)
         connection.Commit()
-
-type SyncDatabase() =
-    inherit Task()
-
-    let mutable connStr = ""
-    let mutable baseDir = ""
-    let mutable moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d_]+).*"
-    let mutable moduleNameSeparator = '_'
-
-    [<Required>]
-    member this.ConnectionString
-        with get() = connStr
-        and set (value) = connStr <- value
-
-    [<Required>]
-    member this.ScriptDirectory
-        with get() = baseDir
-        and set (value) = baseDir <- value
-
-    member this.ModuleDirRegex
-        with get() = moduleDirRegex
-        and set (value) = moduleDirRegex <- value
-
-    member this.ModuleNameSeparator
-        with get() = moduleNameSeparator
-        and set (value) = moduleNameSeparator <- value
-
-    override this.Execute() =
-        let versioner = new DbVersioner(connStr, baseDir, moduleDirRegex, moduleNameSeparator)
-        versioner.ApplyLatestScripts(true)
-        true
+        logger.LogMessage("--Done committing changes", LogImportance.Low)

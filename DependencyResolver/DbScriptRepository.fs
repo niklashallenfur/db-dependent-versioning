@@ -52,7 +52,7 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
         let ignoreFolder =
             let ignoreFile = Path.Combine(baseDir, "IgnoreFolders.txt")
             match File.Exists(ignoreFile) with
-            |false ->   fun x -> true
+            |false ->   fun x -> false
             |true ->    let ignored = File.ReadAllLines(ignoreFile) |> List.ofArray |> List.map (fun dir -> dir.Trim()) |> List.filter (fun x -> not (String.IsNullOrEmpty(x)))
                         fun folderPath -> List.exists (fun x -> x = Path.GetFileName(folderPath)) ignored
             

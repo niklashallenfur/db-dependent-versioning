@@ -53,3 +53,14 @@ type IConnectionResourceProvider =
 type IScriptRepository =
     abstract GetAvailableScripts : unit -> seq<DbScriptSpec>
     abstract LoadScript : DbScriptSpec -> ApplyUndoScript
+
+[<System.Flags>]
+type LogImportance =
+   | Low = 1
+   | Medium = 2
+   | High = 3
+   
+
+type ILogger =
+    abstract LogMessage : string * LogImportance -> unit
+    abstract LogError : string -> unit
