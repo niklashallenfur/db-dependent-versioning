@@ -37,7 +37,8 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
         match rm.Success with
             |false -> failwithf "the module directory name '%s' does not match the required format of '%s'" dirName moduleDirRegex
             |true ->
-                let moduleNameParts = rm.Groups.Item("moduleName").Value.Split([|moduleNameSeparator|], StringSplitOptions.RemoveEmptyEntries)
+                let matched =  rm.Groups.Item("moduleName").Value
+                let moduleNameParts = matched.Split([|moduleNameSeparator|], StringSplitOptions.RemoveEmptyEntries)
                 let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray
                 moduleName
 

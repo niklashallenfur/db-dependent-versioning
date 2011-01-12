@@ -100,7 +100,7 @@ type SyncDatabase() =
 
     let mutable connStr = ""
     let mutable baseDir = ""
-    let mutable moduleDirRegex = @".*(?<moduleName>[\d_]+).*"
+    let mutable moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d_]+).*"
     let mutable moduleNameSeparator = '_'
 
     [<Required>]
