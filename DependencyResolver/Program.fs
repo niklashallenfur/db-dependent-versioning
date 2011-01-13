@@ -8,11 +8,13 @@ open System
 open System.IO
 open System.Text
 
-let moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d\.]+).*"
-let moduleNameSeparator = '.'
-let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
 
-let baseDir = @"D:\Proj\db-versioning\DbScripts"
+let mutable moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d_]+).*"
+let mutable moduleNameSeparator = '_'
+//let moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d\.]+).*"
+//let moduleNameSeparator = '.'
+let connString = @"Data Source=localhost;UID=cwo;PWD=cwo;Initial Catalog=cwoDev2.13;"
+let baseDir = @"D:\tfs\Dev\2.13\Database\CwoDB\Change Scripts"
 
 
 let tempColor color = let oldCol = Console.ForegroundColor
@@ -34,11 +36,11 @@ let consoleLogger = {new ILogger with
 
 let fileLogger = new FileLogger(@"d:\temp\diffscript.sql")
 
-let connectionCreator = SqlConnectionFactory(connString, consoleLogger, Some(fileLogger :> Diffluxum.DbVersioning.Types.ILogger)) :> IConnectionResourceProvider
+let connectionCreator = SqlConnectionFactory(connString, consoleLogger, None) :> IConnectionResourceProvider
 let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
 
 let versioner = DbVersioner(connectionCreator, scriptRepository, consoleLogger)
-versioner.ApplyLatestScripts(true)                        
+versioner.DownGradeUpGrade(true,"2.13.1","2.13.5")
 (fileLogger :> IDisposable).Dispose()
 
 System.Console.ReadKey() |> ignore
