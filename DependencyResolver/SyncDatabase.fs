@@ -17,6 +17,7 @@ type SyncDatabase() =
     let mutable moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d_]+).*"
     let mutable moduleNameSeparator = '_'
     let mutable outputFile = ""
+    let mutable testUndo = true
 
     let getImportance importance = 
         match importance with
@@ -37,6 +38,10 @@ type SyncDatabase() =
     member this.OutputFile
         with get() = outputFile
         and set (value) = outputFile <- value
+
+    member this.TestUndo
+        with get() = testUndo
+        and set (value) = testUndo <- value
 
     member this.ModuleDirRegex
         with get() = moduleDirRegex
@@ -62,6 +67,6 @@ type SyncDatabase() =
         let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
 
         let versioner = new DbVersioner(connectionCreator, scriptRepository, logger)
-        versioner.ApplyLatestScripts(true)
+        versioner.ApplyLatestScripts(testUndo)
         true
 
