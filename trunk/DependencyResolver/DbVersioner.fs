@@ -71,34 +71,43 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
             Some(item)
         Seq.fold folder None sequence
 
-    member x.DownGrade(belowVersion, connection : IConnectionResource) =
-        logger.LogMessage(sprintf "Trying to downgrade below %s " belowVersion, LogImportance.High)
-        let scriptName = ScriptName.Parse(belowVersion)
-        logger.LogMessage("Getting available scripts ", LogImportance.Low)
-        let scripts = scriptRepository.GetAvailableScripts() |> List.ofSeq
-        logger.LogMessage(sprintf "Number of available scripts: %i" (List.length scripts), LogImportance.Low)
-        logger.LogMessage("Getting already executed scripts", LogImportance.Low)
-        let alreadyExecuted = connection.GetAlreadyExecuted()
-
-        let rec buildToExecute name acc existing =
-            match existing with
-            |[] -> ([], false)
-            |x::tail when x = name -> (x::acc, true)
-            |x::tail -> buildToExecute name (x::acc) tail
+    member x.DownGrade(belowVersion, connection : IConnectionResource) =        
+        match String.IsNullOrEmpty(belowVersion) with
+            |true  -> logger.LogMessage("No version specified to downgrade below.", LogImportance.High)
+            |false ->
+                logger.LogMessage(sprintf "Trying to downgrade below %s " belowVersion, LogImportance.High)
+                let rec buildToExecute acc existing =
+                    let scriptName = ScriptName.Parse(belowVersion)
+                    match existing with
+                    |[] -> ([], false)
+                    |x::tail when x = scriptName -> (x::acc, true)
+                    |x::tail -> buildToExecute (x::acc) tail
+                                                
+                logger.LogMessage("Getting available scripts ", LogImportance.Low)
+                let scripts = scriptRepository.GetAvailableScripts() |> List.ofSeq
+                logger.LogMessage(sprintf "Number of available scripts: %i" (List.length scripts), LogImportance.Low)
+                logger.LogMessage("Getting already executed scripts", LogImportance.Low)
+                let alreadyExecuted = connection.GetAlreadyExecuted()                
             
-        let (namesToExecute, nameFound) = buildToExecute scriptName [] (List.ofSeq alreadyExecuted |> List.rev)        
+                let (namesToExecute, nameFound) = buildToExecute [] (List.ofSeq alreadyExecuted |> List.rev)        
         
-        match nameFound with
-        |false -> ignore 0
-        |true ->    let findScript name = List.find (fun x -> x.Name = name) scripts
-                    let scriptsToExecute = List.map findScript namesToExecute |> List.rev          
-                    let undo() = scriptsToExecute |> List.map (fun s -> undoScript connection scriptRepository.LoadScript s) |> ignore                        
-                    logger.LogMessage("Undoing scripts", LogImportance.Medium)
-                    undo()
+                match nameFound with
+                |false -> ignore 0
+                |true ->    let findScript name = List.find (fun x -> x.Name = name) scripts
+                            let scriptsToExecute = List.map findScript namesToExecute |> List.rev          
+                            let undo() = scriptsToExecute |> List.map (fun s -> undoScript connection scriptRepository.LoadScript s) |> ignore                        
+                            logger.LogMessage("Undoing scripts", LogImportance.Medium)
+                            undo()
 
     member x.Upgrade (testUndo, toVersion, connection : IConnectionResource) =
-        logger.LogMessage(sprintf "Trying to upgrade to %s " toVersion, LogImportance.High)
-        let scriptName = ScriptName.Parse(toVersion)
+        let equalsToVersion =
+            match String.IsNullOrEmpty(toVersion) with
+                |false  ->  logger.LogMessage(sprintf "Trying to upgrade to %s " toVersion, LogImportance.High)
+                            let scriptName = ScriptName.Parse(toVersion)
+                            fun x -> x = scriptName                
+                |true ->    logger.LogMessage("Trying to upgrade to latest version", LogImportance.High)
+                            fun x -> false        
+        
         logger.LogMessage("Getting available scripts ", LogImportance.Low)
         let scripts = scriptRepository.GetAvailableScripts() |> List.ofSeq
         logger.LogMessage(sprintf "Number of available scripts: %i" (List.length scripts), LogImportance.Low)
@@ -122,20 +131,20 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
         
         logger.LogMessage(sprintf "not executed: %i" (List.length notExecuted),LogImportance.Low)
 
-        let rec buildToExecute name acc existing =
+        let rec buildToExecute acc existing =
             match existing with
-            |[] -> []
-            |x::tail when x.Name = name -> x::acc
-            |x::tail -> buildToExecute name (x::acc) tail
+            |[] -> acc
+            |x::tail when equalsToVersion x.Name -> x::acc
+            |x::tail -> buildToExecute (x::acc) tail
             
-        let scriptsToExecute = buildToExecute scriptName [] notExecuted |> List.rev
+        let scriptsToExecute = buildToExecute [] notExecuted |> List.rev
 
         logger.LogMessage(sprintf "Number of scripts to execute: %i" (List.length scriptsToExecute), LogImportance.Medium)
 
         let apply() = scriptsToExecute |> List.map (fun s -> applyScript connection scriptRepository.LoadScript s) |> ignore
         let undo() = scriptsToExecute |> List.rev |> List.map (fun s -> undoScript connection scriptRepository.LoadScript s) |> ignore
         let testUndoScripts() =
-            logger.LogMessage("Undoing scripts", LogImportance.Medium)
+            logger.LogMessage("Testing to undo and re-apply scripts", LogImportance.Medium)
             undo()
             logger.LogMessage("Re-applying scripts", LogImportance.Medium)
             apply()
