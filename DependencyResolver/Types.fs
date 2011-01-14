@@ -14,7 +14,12 @@ type ScriptName =
             |[] -> ""
             |subv::tail -> sprintf "%i.%s" subv (dotify tail)
         sprintf "%s%i" (dotify x.Module) x.Number
-    static member Parse (name:string) = let nameParts = name.Split('.') |> List.ofArray |> List.map Int32.Parse
+    static member Parse (name:string) = 
+                                        let nameParts =
+                                            try 
+                                                 name.Split('.') |> List.ofArray |> List.map Int32.Parse
+                                            with
+                                                | :? System.FormatException -> failwithf "'%s' is not a valid script name" name
                                         let rev = nameParts |> List.rev
                                         let number = rev.Head
                                         let moduleName = rev.Tail |> List.rev
