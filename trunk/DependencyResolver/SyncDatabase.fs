@@ -19,37 +19,26 @@ type SyncDatabase() =
     let mutable outputFile = ""
     let mutable testUndo = true
 
+    let mutable downBelowVersion = ""
+    let mutable upToVersion = ""
+    let mutable signature = ""
+
     let getImportance importance = 
         match importance with
         |LogImportance.Low -> MessageImportance.Low        
         |LogImportance.High -> MessageImportance.High
         |_ -> MessageImportance.Normal
 
-    [<Required>]
-    member this.ConnectionString
-        with get() = connStr
-        and set (value) = connStr <- value
-
-    [<Required>]
-    member this.ScriptDirectory
-        with get() = baseDir
-        and set (value) = baseDir <- value
-
-    member this.OutputFile
-        with get() = outputFile
-        and set (value) = outputFile <- value
-
-    member this.TestUndo
-        with get() = testUndo
-        and set (value) = testUndo <- value
-
-    member this.ModuleDirRegex
-        with get() = moduleDirRegex
-        and set (value) = moduleDirRegex <- value
-
-    member this.ModuleNameSeparator
-        with get() = moduleNameSeparator
-        and set (value) = moduleNameSeparator <- value
+    [<Required>] member this.ConnectionString with get() = connStr and set (value) = connStr <- value
+    [<Required>] member this.ScriptDirectory with get() = baseDir and set (value) = baseDir <- value
+    [<Required>] member this.Signature with get() = signature and set (value) = signature <- value
+    
+    member this.UpToVersion with get() = upToVersion and set (value) = upToVersion <- value
+    member this.DownBelowVersion with get() = downBelowVersion and set (value) = downBelowVersion <- value
+    member this.OutputFile with get() = outputFile and set (value) = outputFile <- value
+    member this.TestUndo with get() = testUndo and set (value) = testUndo <- value
+    member this.ModuleDirRegex  with get() = moduleDirRegex and set (value) = moduleDirRegex <- value
+    member this.ModuleNameSeparator with get() = moduleNameSeparator  and set (value) = moduleNameSeparator <- value
 
     override this.Execute() =
         let logger = {new Diffluxum.DbVersioning.Types.ILogger with 
@@ -66,7 +55,7 @@ type SyncDatabase() =
         let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput) :> IConnectionResourceProvider
         let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
 
-        let versioner = new DbVersioner(connectionCreator, scriptRepository, logger)
-        versioner.ApplyLatestScripts(testUndo)
+        let versioner = new DbVersioner(connectionCreator, scriptRepository, logger)    
+        versioner.DownGradeUpGrade(testUndo, downBelowVersion, upToVersion, signature)    
         true
 

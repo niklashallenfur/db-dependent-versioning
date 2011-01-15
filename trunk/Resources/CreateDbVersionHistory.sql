@@ -4,7 +4,8 @@
 	[ExecutedFrom] [nvarchar](512) NOT NULL,
 	[Description] [nvarchar](512) NOT NULL,
 	[DependentOnScriptVersion] [nvarchar](100) NULL,
-	[DateExecutedUtc] [datetime] NOT NULL
+	[DateExecutedUtc] [datetime] NOT NULL,
+	[Signature] [nvarchar](512) NOT NULL
  CONSTRAINT [PK_DbVersioningHistory] PRIMARY KEY CLUSTERED 
 (
 	[ScriptVersion] ASC

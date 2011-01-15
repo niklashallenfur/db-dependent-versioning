@@ -49,7 +49,7 @@ type IConnectionResource =
     abstract ExecuteScript : string * string option -> unit
     abstract Commit : unit -> unit
     abstract GetAlreadyExecuted : unit -> seq<ScriptName>
-    abstract RegisterExecuted : DbScriptSpec -> unit
+    abstract RegisterExecuted : DbScriptSpec * string -> unit
     abstract UnRegisterExecuted : DbScriptSpec -> unit
 
 type IConnectionResourceProvider =

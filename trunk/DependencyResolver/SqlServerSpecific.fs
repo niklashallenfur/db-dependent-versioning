@@ -44,11 +44,11 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
                         yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
                     |> List.ofSeq        
 
-    let registerCreated sqlExecuter (script : DbScriptSpec) : unit =
+    let registerCreated sqlExecuter (script : DbScriptSpec) signature : unit =
             let dependency = match script.DependentOn with
                                 | None -> "NULL"
                                 | Some(name) -> sprintf "'%s'" (name.ToString())        
-            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc) VALUES('%s', '%s','%s', %s, GETUTCDATE())" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency
+            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc, Signature) VALUES('%s', '%s','%s', %s, GETUTCDATE(), '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency signature
             sqlExecuter registerScript (Some(sprintf "Registering %s as applied" (script.Name.ToString())))
 
     let unRegisterCreated sqlExecuter (script : DbScriptSpec) =                
@@ -68,7 +68,7 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
         {new IConnectionResource with        
             member this.GetAlreadyExecuted() = getAlreadyExecuted createCommand (fun() -> assertVersioningTableExists createCommand sqlExecuter):> seq<ScriptName>
             member this.ExecuteScript(toExecute, comment) = sqlExecuter toExecute comment
-            member this.RegisterExecuted(scriptSpec) = registerCreated sqlExecuter scriptSpec
+            member this.RegisterExecuted(scriptSpec, signature) = registerCreated sqlExecuter scriptSpec signature
             member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec
             member this.Commit() = trans.Commit()        
             member this.Dispose() = trans.Dispose()
