@@ -14,7 +14,6 @@ let tempColor color = let oldCol = Console.ForegroundColor
                       {new IDisposable with member this.Dispose() = Console.ForegroundColor <- oldCol}
 
 
-
 let consoleLogger = {new ILogger with 
               member this.LogMessage(text, importance) =    let col =   match importance with
                                                                         |LogImportance.High -> ConsoleColor.White
@@ -40,7 +39,7 @@ let connectionCreator = SqlConnectionFactory(connString, consoleLogger, None) :>
 let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
 
 let versioner = DbVersioner(connectionCreator, scriptRepository, consoleLogger)
-versioner.DownGradeUpGrade(true,"","2.13.4")
+versioner.DownGradeUpGrade(true,"2.13.1","2.13.1", "hallenfur testing")
 (fileLogger :> IDisposable).Dispose()
 
 System.Console.ReadKey() |> ignore
