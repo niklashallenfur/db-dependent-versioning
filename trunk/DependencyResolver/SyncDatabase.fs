@@ -43,7 +43,8 @@ type SyncDatabase() =
     override this.Execute() =
         let logger = {new Diffluxum.DbVersioning.Types.ILogger with 
                           member l.LogMessage(text, importance) = this.Log.LogMessage(getImportance(importance) ,text);
-                          member l.LogError(text) =  this.Log.LogError(text)}
+                          member l.LogError(text) =  this.Log.LogError(text)
+                          member l.LogWarning(text) = this.Log.LogWarning(text)}
 
         let (sqlOutput, outputFileDisposable) =
             match String.IsNullOrEmpty(outputFile) with
@@ -53,7 +54,7 @@ type SyncDatabase() =
         use d = outputFileDisposable
 
         let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput) :> IConnectionResourceProvider
-        let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator) :> IScriptRepository
+        let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger) :> IScriptRepository
 
         let versioner = new DbVersioner(connectionCreator, scriptRepository, logger)    
         versioner.DownGradeUpGrade(testUndo, downBelowVersion, upToVersion, signature)    

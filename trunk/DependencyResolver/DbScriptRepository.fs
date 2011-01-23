@@ -6,7 +6,7 @@ open System.Text.RegularExpressions
 open System.Text
 open Diffluxum.DbVersioning.Types
 
-type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) =    
+type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, logger : ILogger) =    
     let getScriptDependency moduleFile =
         let dependsOnRegex = @"\s*--\s*//@DEPENDSON\s*=\s*(?<dependsOnScript>[\d\.]+)\s*"
         let firstLine =
@@ -63,7 +63,12 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char) 
     let loadScript spec =
         let fileText = File.ReadAllText(spec.Path, Encoding.Default)
         let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
-        {ApplyScript = parts.[0]; UndoScript = parts.[1]}
+        match parts.Length with
+        |2-> {ApplyScript = parts.[0]; UndoScript = parts.[1]}
+        |1-> logger.LogWarning(sprintf "Script %s did not contain an undo-script, separated using '--//@UNDO' (%s)" (spec.Name.ToString()) (spec.Path))
+             {ApplyScript = parts.[0]; UndoScript = String.Empty}
+        |x-> failwithf "Script %s too many undo-scripts (%i), separated using '--//@UNDO' (%s)" (spec.Name.ToString()) (x-1) (spec.Path)
+        
 
     interface IScriptRepository with
         member this.GetAvailableScripts() = Seq.ofList (readAvailableScripts baseDir)

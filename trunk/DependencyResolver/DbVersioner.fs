@@ -11,6 +11,7 @@ type FileLogger(file) =
     interface Diffluxum.DbVersioning.Types.ILogger with
         member this.LogMessage(text, importance) = textBuilder.AppendLine(text) |> ignore
         member this.LogError(text) = textBuilder.AppendLine(text) |> ignore
+        member this.LogWarning(text) = textBuilder.AppendLine(text) |> ignore
 
     interface IDisposable with
         member this.Dispose() = File.WriteAllText(file, textBuilder.ToString())
@@ -164,25 +165,35 @@ open NUnit.Framework
 open Rhino.Mocks
 open MockExtensions
 
+
+type ConsoleLogger() =
+            let tempColor color =   let oldCol = Console.ForegroundColor
+                                    Console.ForegroundColor <- color
+                                    {new IDisposable with member this.Dispose() = Console.ForegroundColor <- oldCol}
+            
+            let log (text:string) importance =    
+                let col =   match importance with
+                            |LogImportance.High -> ConsoleColor.White
+                            |LogImportance.Medium -> ConsoleColor.Gray
+                            |LogImportance.Low -> ConsoleColor.DarkGray
+                            |x -> failwithf "%A not implemented" x
+                use c = tempColor col
+                Console.WriteLine(text);
+
+            interface ILogger with 
+                      member this.LogMessage(text, importance) = log text importance
+                      member this.LogError(text) =  use c = tempColor ConsoleColor.Red
+                                                    Console.WriteLine(text)
+                      member this.LogWarning(text) = log ("Warning: " + text) LogImportance.High
+
 [<TestFixture>]
 type DbVersionerSpecs() =
 
-    let tempColor color = let oldCol = Console.ForegroundColor
-                          Console.ForegroundColor <- color
-                          {new IDisposable with member this.Dispose() = Console.ForegroundColor <- oldCol}
 
 
 
-    let consoleLogger = {new ILogger with 
-                  member this.LogMessage(text, importance) =    let col =   match importance with
-                                                                            |LogImportance.High -> ConsoleColor.White
-                                                                            |LogImportance.Medium -> ConsoleColor.Gray
-                                                                            |LogImportance.Low -> ConsoleColor.DarkGray
-                                                                            |x -> failwithf "%A not implemented" x
-                                                                use c = tempColor col
-                                                                Console.WriteLine(text);
-                  member this.LogError(text) =  use c = tempColor ConsoleColor.Red
-                                                Console.WriteLine(text)}
+
+    let consoleLogger = ConsoleLogger()
 
 
     let mocks = MockRepository()
