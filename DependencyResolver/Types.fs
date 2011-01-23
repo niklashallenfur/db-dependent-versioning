@@ -69,3 +69,4 @@ type LogImportance =
 type ILogger =
     abstract LogMessage : string * LogImportance -> unit
     abstract LogError : string -> unit
+    abstract LogWarning : string -> unit
