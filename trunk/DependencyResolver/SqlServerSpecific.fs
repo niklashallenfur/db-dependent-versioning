@@ -44,11 +44,11 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
                         yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
                     |> List.ofSeq        
 
-    let registerCreated sqlExecuter (script : DbScriptSpec) signature : unit =
+    let registerCreated sqlExecuter (script : DbScriptSpec) (signature : string) : unit =
             let dependency = match script.DependentOn with
                                 | None -> "NULL"
                                 | Some(name) -> sprintf "'%s'" (name.ToString())        
-            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc, Signature) VALUES('%s', '%s','%s', %s, GETUTCDATE(), '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency signature
+            let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc, Signature) VALUES('%s', '%s','%s', %s, GETUTCDATE(), '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (signature.Replace("'", "''"))
             sqlExecuter registerScript (Some(sprintf "Registering %s as applied" (script.Name.ToString())))
 
     let unRegisterCreated sqlExecuter (script : DbScriptSpec) =                
