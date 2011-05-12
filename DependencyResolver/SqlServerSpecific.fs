@@ -15,7 +15,7 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
 
     let executeSql createCommand (script : string) (comment : string option) =
         let script = mergeComment script comment
-        let statements =
+        let statements =            
             script.Split([|"GO"|], StringSplitOptions.RemoveEmptyEntries)
             |> Array.map (fun s -> s.Trim())
             |> Array.filter (fun s -> not (String.IsNullOrWhiteSpace s))
