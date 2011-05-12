@@ -26,11 +26,11 @@ let baseDir = @"D:\Proj\db-versioning\DbScripts"
 
 let fileLogger = new FileLogger(@"d:\temp\diffscript.sql")
 
-let connectionCreator = SqlConnectionFactory(connString, consoleLogger, None) :> IConnectionResourceProvider
+let connectionCreator = SqlConnectionFactory(connString, fileLogger, None) :> IConnectionResourceProvider
 let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, consoleLogger) :> IScriptRepository
 
 let versioner = DbVersioner(connectionCreator, scriptRepository, consoleLogger)
-versioner.DownGradeUpGrade(true,"2.13.1","2.13.1", "hallenfur testing")
+versioner.DownGradeUpGrade(false,"","", "nikhal manual history update")
 (fileLogger :> IDisposable).Dispose()
 
 System.Console.ReadKey() |> ignore

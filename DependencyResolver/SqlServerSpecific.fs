@@ -2,6 +2,7 @@
 
 open System
 open System.Data.SqlClient
+open System.Transactions
 open Diffluxum.DbVersioning.Types
 open Diffluxum.DbVersioning.Resources
 
@@ -51,26 +52,29 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
             let registerScript = sprintf "INSERT INTO DbVersioningHistory(ScriptVersion, ExecutedFrom, Description, DependentOnScriptVersion, DateExecutedUtc, Signature) VALUES('%s', '%s','%s', %s, GETUTCDATE(), '%s')" (script.Name.ToString()) (script.Path.ToString()) (script.Description.ToString()) dependency (signature.Replace("'", "''"))
             sqlExecuter registerScript (Some(sprintf "Registering %s as applied" (script.Name.ToString())))
 
-    let unRegisterCreated sqlExecuter (script : DbScriptSpec) =                
+    let unRegisterCreated sqlExecuter (script : DbScriptSpec) =
             let unregisterScript = sprintf "DELETE FROM DbVersioningHistory WHERE ScriptVersion='%s'" (script.Name.ToString())
             sqlExecuter unregisterScript (Some(sprintf "Unregistering %s as applied" (script.Name.ToString())))
 
     let createSqlConnection connStr = 
         let conn = new SqlConnection(connStr)
-        let trans = conn.Open() 
+        let trans = conn.Open()
                     conn.BeginTransaction(Data.IsolationLevel.Serializable)
-        let createCommand commandText = new SqlCommand(commandText, conn, trans)
+        
+        let createCommand commandText = let cmd = new SqlCommand(commandText, conn, trans)
+                                        cmd.CommandTimeout <- 3600
+                                        cmd
         let sqlExecuter =
             match sqlOutput with
             | None -> executeSql createCommand
             | Some(output) -> fun script comment -> output.LogMessage(mergeComment script comment, LogImportance.Low)
          
-        {new IConnectionResource with        
+        {new IConnectionResource with
             member this.GetAlreadyExecuted() = getAlreadyExecuted createCommand (fun() -> assertVersioningTableExists createCommand sqlExecuter):> seq<ScriptName>
             member this.ExecuteScript(toExecute, comment) = sqlExecuter toExecute comment
             member this.RegisterExecuted(scriptSpec, signature) = registerCreated sqlExecuter scriptSpec signature
             member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec
-            member this.Commit() = trans.Commit()        
+            member this.Commit() = trans.Commit()
             member this.Dispose() = trans.Dispose()
                                     conn.Dispose()}
 
