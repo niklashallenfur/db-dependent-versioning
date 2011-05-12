@@ -55,9 +55,9 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
 
     let applyScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec ) signature =
         let applyUndo = (scriptLoader spec)
-        let message = sprintf "Applying %s" (spec.Name.ToString())
-        logger.LogMessage(message, LogImportance.High)
-        connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
+//        let message = sprintf "Applying %s" (spec.Name.ToString())
+//        logger.LogMessage(message, LogImportance.High)
+//        connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
         connection.RegisterExecuted (spec,signature)        
 
     let undoScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
