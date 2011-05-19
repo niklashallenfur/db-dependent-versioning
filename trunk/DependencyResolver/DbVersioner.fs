@@ -27,6 +27,7 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
                 | None ->
                     match previous with
                     | None -> scriptSpec::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
+                    | Some(name) when name = scriptSpec.Name -> failwithf "Script %A has duplicate files" (name.ToString())
                     | Some(name) when name.Module = scriptSpec.Name.Module 
                         -> {scriptSpec with DependentOn = previous}::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
                     | _ -> scriptSpec::(innerTransformToItemDependent (Some(scriptSpec.Name)) tail)
