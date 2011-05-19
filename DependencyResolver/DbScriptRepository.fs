@@ -48,6 +48,14 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
         let moduleScripts = moduleFiles |> List.ofArray |> List.map (getModuleScript moduleName)
         (moduleName, moduleScripts)
 
+//    let findDuplicates elements =
+//        let rec findDuplicatesHelper elements duplicates =
+//            match elements with
+//                |[] -> Set.ofList duplicates
+//                |x::xs when (List.exists (fun item -> item = x) xs) -> findDuplicatesHelper xs (x::duplicates)
+//                |x::xs -> findDuplicatesHelper xs duplicates
+//        findDuplicatesHelper elements []
+
     let readAvailableScripts baseDir =
         let ignoreFolder =
             let ignoreFile = Path.Combine(baseDir, "IgnoreFolders.txt")
@@ -56,9 +64,9 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
             |true ->    let ignored = File.ReadAllLines(ignoreFile) |> List.ofArray |> List.map (fun dir -> dir.Trim()) |> List.filter (fun x -> not (String.IsNullOrEmpty(x)))
                         fun folderPath -> List.exists (fun x -> x = Path.GetFileName(folderPath)) ignored
             
-        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName ->   int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0 && not(ignoreFolder dirName))//&& Regex.IsMatch(Path.GetFileName(dirName), moduleDirRegex))
+        let moduleDirs = Directory.GetDirectories(baseDir) |> List.ofArray |> List.filter (fun dirName -> int(DirectoryInfo(dirName).Attributes &&& FileAttributes.Hidden) = 0 && not(ignoreFolder dirName))//&& Regex.IsMatch(Path.GetFileName(dirName), moduleDirRegex))
         let scripts = moduleDirs |> List.map getModule |> List.collect (fun (_, scripts) -> scripts)
-        scripts
+        scripts        
 
     let loadScript spec =
         let fileText = File.ReadAllText(spec.Path, Encoding.Default)

@@ -17,7 +17,6 @@ let tempColor color = let oldCol = Console.ForegroundColor
 let consoleLogger = ConsoleLogger()
 
 
-
 let moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d\.]+).*"
 let moduleNameSeparator = '.'
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
@@ -26,7 +25,7 @@ let baseDir = @"D:\Proj\db-versioning\DbScripts"
 
 let fileLogger = new FileLogger(@"d:\temp\diffscript.sql")
 
-let connectionCreator = SqlConnectionFactory(connString, fileLogger, None) :> IConnectionResourceProvider
+let connectionCreator = SqlConnectionFactory(connString, consoleLogger, None) :> IConnectionResourceProvider
 let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, consoleLogger) :> IScriptRepository
 
 let versioner = DbVersioner(connectionCreator, scriptRepository, consoleLogger)
