@@ -17,6 +17,7 @@ let tempColor color = let oldCol = Console.ForegroundColor
 let consoleLogger = ConsoleLogger()
 
 
+
 let moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d\.]+).*"
 let moduleNameSeparator = '.'
 let connString = @"Server=.;AttachDbFilename=|DataDirectory|TestDb.mdf;Trusted_Connection=Yes;"
