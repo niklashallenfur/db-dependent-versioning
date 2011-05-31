@@ -59,7 +59,7 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
     let createSqlConnection connStr = 
         let conn = new SqlConnection(connStr)
         let trans = conn.Open()
-                    conn.BeginTransaction(Data.IsolationLevel.Serializable)
+                    conn.BeginTransaction(Data.IsolationLevel.ReadCommitted)
         
         let createCommand commandText = let cmd = new SqlCommand(commandText, conn, trans)
                                         cmd.CommandTimeout <- 3600
