@@ -11,7 +11,8 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
         let dependsOnRegex = @"\s*--\s*//@DEPENDSON\s*=\s*(?<dependsOnScript>[\d\.]+)\s*"
         let firstLine =
             use file = File.OpenText(moduleFile)
-            file.ReadLine()
+            let l = file.ReadLine()
+            if l = null then String.Empty else l
         let rm = Regex.Match(firstLine, dependsOnRegex)
         match rm.Success with
         | false -> None 
@@ -42,10 +43,22 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
                 let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray
                 moduleName
 
+    let hasContent (path : string) =
+        let info = System.IO.FileInfo(path)
+        if info.Length > 50L then
+            true
+        else
+            let text = info.OpenText().ReadToEnd()
+            not (String.IsNullOrWhiteSpace text)
+
     let getModule moduleDir =
         let moduleName = getModuleName (Path.GetFileName(moduleDir))
         let moduleFiles = Directory.GetFiles(moduleDir,"*.sql")
-        let moduleScripts = moduleFiles |> List.ofArray |> List.map (getModuleScript moduleName)
+        let moduleScripts =
+            moduleFiles
+            |> List.ofArray
+            |> List.filter hasContent
+            |> List.map (getModuleScript moduleName)
         (moduleName, moduleScripts)
 
 //    let findDuplicates elements =
@@ -71,10 +84,11 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
     let loadScript spec =
         let fileText = File.ReadAllText(spec.Path, Encoding.Default)
         let parts = fileText.Split([|"--//@UNDO"|], StringSplitOptions.None)
+        let isEmpty = String.IsNullOrWhiteSpace(fileText)
         match parts.Length with
-        |2-> {ApplyScript = parts.[0]; UndoScript = parts.[1]}
+        |2-> {ApplyScript = parts.[0]; UndoScript = parts.[1]; IsEmpty = isEmpty}
         |1-> logger.LogWarning(sprintf "Script %s did not contain an undo-script, separated using '--//@UNDO' (%s)" (spec.Name.ToString()) (spec.Path))
-             {ApplyScript = parts.[0]; UndoScript = String.Empty}
+             {ApplyScript = parts.[0]; UndoScript = String.Empty; IsEmpty = isEmpty}
         |x-> failwithf "Script %s too many undo-scripts (%i), separated using '--//@UNDO' (%s)" (spec.Name.ToString()) (x-1) (spec.Path)
         
 

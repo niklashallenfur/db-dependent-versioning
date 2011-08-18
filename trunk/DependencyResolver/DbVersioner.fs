@@ -58,8 +58,11 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
         let applyUndo = (scriptLoader spec)
         let message = sprintf "Applying %s" (spec.Name.ToString())
         logger.LogMessage(message, LogImportance.High)
-        connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
-        connection.RegisterExecuted (spec,signature)        
+        if not applyUndo.IsEmpty then do
+            connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
+            connection.RegisterExecuted (spec,signature)        
+        else do
+            logger.LogMessage(sprintf "Skipped %s as it is an empty script" (spec.Name.ToString()), LogImportance.High)
 
     let undoScript (connection : IConnectionResource) (scriptLoader : DbScriptSpec -> ApplyUndoScript) (spec : DbScriptSpec) =
         let applyUndo = (scriptLoader spec)
@@ -218,10 +221,10 @@ type DbVersionerSpecs() =
     let script3 = {scriptTemplate with Name = scriptName3; DependentOn = Some(scriptName2)}
     let script4 = {scriptTemplate with Name = scriptName4; DependentOn = Some(scriptName3)}
 
-    let text1 = {ApplyScript="a1"; UndoScript="u1"}
-    let text2 = {ApplyScript="a2"; UndoScript="u2"}
-    let text3 = {ApplyScript="a3"; UndoScript="u3"}
-    let text4 = {ApplyScript="a4"; UndoScript="u4"}
+    let text1 = {ApplyScript="a1"; UndoScript="u1";IsEmpty = false}
+    let text2 = {ApplyScript="a2"; UndoScript="u2";IsEmpty = false}
+    let text3 = {ApplyScript="a3"; UndoScript="u3";IsEmpty = false}
+    let text4 = {ApplyScript="a4"; UndoScript="u4";IsEmpty = false}
 
     [<SetUp>]
     member x.Setup() =
