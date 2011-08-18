@@ -42,6 +42,7 @@ type DbScriptSpec =
 type ApplyUndoScript = {
     ApplyScript : string;
     UndoScript : string;
+    IsEmpty : bool;
     }
 
 type IConnectionResource =
