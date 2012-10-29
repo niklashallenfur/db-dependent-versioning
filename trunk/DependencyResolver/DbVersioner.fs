@@ -16,7 +16,11 @@ type FileLogger(file) =
     interface IDisposable with
         member this.Dispose() = File.WriteAllText(file, textBuilder.ToString())
 
-type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptRepository : IScriptRepository, logger : Diffluxum.DbVersioning.Types.ILogger) =
+type DbVersioner(
+                    connectionCreator : IConnectionResourceProvider,
+                    scriptRepository : IScriptRepository,
+                    logger : Diffluxum.DbVersioning.Types.ILogger,
+                    remapModuleName : (int list -> int list)) =
     let TransformToItemDependent items =
         let rec innerTransformToItemDependent (previous:ScriptName option) items =
             match items with
@@ -82,7 +86,7 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
             |false ->
                 logger.LogMessage(sprintf "Trying to downgrade below %s " belowVersion, LogImportance.High)
                 let rec buildToExecute acc existing =
-                    let scriptName = ScriptName.Parse(belowVersion)
+                    let scriptName = ScriptName.Parse belowVersion |> fun x -> {x with Module = remapModuleName x.Module}
                     match existing with
                     |[] -> ([], false)
                     |x::tail when x = scriptName -> (x::acc, true)
@@ -108,7 +112,7 @@ type DbVersioner(connectionCreator : IConnectionResourceProvider, scriptReposito
         let equalsToVersion =
             match String.IsNullOrEmpty(toVersion) with
                 |false  ->  logger.LogMessage(sprintf "Trying to upgrade to %s " toVersion, LogImportance.High)
-                            let scriptName = ScriptName.Parse(toVersion)
+                            let scriptName = ScriptName.Parse toVersion |> fun x -> {x with Module = remapModuleName x.Module}
                             fun x -> x = scriptName                
                 |true ->    logger.LogMessage("Trying to upgrade to latest version", LogImportance.High)
                             fun x -> false        
@@ -206,7 +210,7 @@ type DbVersionerSpecs() =
     let connection = mocks.Stub<IConnectionResource>()
     let scriptRepository = mocks.Stub<IScriptRepository>()
     let logger = consoleLogger
-    let versioner = DbVersioner(connectionProvider, scriptRepository, logger)
+    let versioner = DbVersioner(connectionProvider, scriptRepository, logger, id)
 
     let moduleName = [1;10]
     let templateName = {Module = moduleName; Number = -1}

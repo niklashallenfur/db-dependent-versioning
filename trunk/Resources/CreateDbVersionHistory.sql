@@ -14,9 +14,5 @@
 
 GO
 
-ALTER TABLE [dbo].[DbVersioningHistory]  WITH CHECK ADD  CONSTRAINT [FK_DbVersioningHistory_DbVersioningHistory] FOREIGN KEY([DependentOnScriptVersion])
-REFERENCES [dbo].[DbVersioningHistory] ([ScriptVersion])
-GO
-
 ALTER TABLE [dbo].[DbVersioningHistory] CHECK CONSTRAINT [FK_DbVersioningHistory_DbVersioningHistory]
 GO

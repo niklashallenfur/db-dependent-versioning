@@ -18,6 +18,8 @@ type SyncDatabase() =
     let mutable moduleNameSeparator = '_'
     let mutable outputFile = ""
     let mutable testUndo = true
+    let mutable scriptNameRemap = ""
+
 
     let mutable downBelowVersion = ""
     let mutable upToVersion = ""
@@ -39,6 +41,7 @@ type SyncDatabase() =
     member this.TestUndo with get() = testUndo and set (value) = testUndo <- value
     member this.ModuleDirRegex  with get() = moduleDirRegex and set (value) = moduleDirRegex <- value
     member this.ModuleNameSeparator with get() = moduleNameSeparator  and set (value) = moduleNameSeparator <- value
+    member this.ScriptNameRemap with get() = scriptNameRemap  and set (value) = scriptNameRemap <- value
 
     override this.Execute() =
         let logger = {new Diffluxum.DbVersioning.Types.ILogger with 
@@ -53,10 +56,12 @@ type SyncDatabase() =
                         (Some(fileLogger :> Diffluxum.DbVersioning.Types.ILogger), fileLogger :> IDisposable)        
         use d = outputFileDisposable
 
-        let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput) :> IConnectionResourceProvider
-        let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger) :> IScriptRepository
+        let remapModuleName = Diffluxum.DbVersioning.Remap.createRemappings scriptNameRemap
 
-        let versioner = new DbVersioner(connectionCreator, scriptRepository, logger)    
+        let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
+        let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger, remapModuleName) :> IScriptRepository
+
+        let versioner = new DbVersioner(connectionCreator, scriptRepository, logger, remapModuleName)    
         versioner.DownGradeUpGrade(testUndo, downBelowVersion, upToVersion, signature)    
         true
 

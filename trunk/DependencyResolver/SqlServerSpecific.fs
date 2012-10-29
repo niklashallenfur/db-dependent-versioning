@@ -6,7 +6,7 @@ open System.Transactions
 open Diffluxum.DbVersioning.Types
 open Diffluxum.DbVersioning.Resources
 
-type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option) =
+type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option, remapModuleName : (int list -> int list)) =
 
     let mergeComment script comment =
         match comment with
@@ -32,18 +32,32 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
         match versioningTables with
         |0 ->   sqlExecuter SqlResources.CreateDbVersionHistory (Some "Creating DbVersioningHistory")
                 false
-        |1 ->   true
-        |x -> failwith (sprintf "Strange number of DbVersioningHistory tables in db: %i" x)
+        |1 ->
+            // Remove the foreign key!
+            sqlExecuter SqlResources.RemoveForeginKey (Some "Removing foreign key in DbVersioningHistory")
+            true
+        |x -> failwith (sprintf "Strange number of DbVersioningHistory tables in db: %i" x)        
     
-    let getAlreadyExecuted createCommand assertVersioningTableExists =
-            match assertVersioningTableExists() with
-            |false -> []
-            |true ->
-                use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
-                use reader = command.ExecuteReader()    
-                seq {  while reader.Read() do
-                        yield ScriptName.Parse (string(reader.["ScriptVersion"]))}
-                    |> List.ofSeq        
+    let getAlreadyExecuted sqlExecuter createCommand assertVersioningTableExists =
+            let existing =
+                match assertVersioningTableExists() with
+                |false -> []
+                |true ->
+                    use command : SqlCommand = createCommand "SELECT ScriptVersion FROM DbVersioningHistory ORDER BY ID ASC"
+                    use reader = command.ExecuteReader()    
+                    seq {  while reader.Read() do
+                            yield  ScriptName.Parse (string(reader.["ScriptVersion"])) }
+                        |> List.ofSeq
+
+
+            let remapped = existing |> List.map (fun x -> {x with Module = remapModuleName x.Module})
+            let needsRemapping =
+                List.zip existing remapped
+                |> List.filter (fun (existing, remapped) -> not (existing.ToString() = remapped.ToString()))
+
+            needsRemapping
+                |> List.iter (fun (existing, remapped) -> sqlExecuter (String.Format(SqlResources.RemapScriptVersion, existing, remapped)) None)
+            remapped
 
     let registerCreated sqlExecuter (script : DbScriptSpec) (signature : string) : unit =
             let dependency = match script.DependentOn with
@@ -70,7 +84,7 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
             | Some(output) -> fun script comment -> output.LogMessage(mergeComment script comment, LogImportance.Low)
          
         {new IConnectionResource with
-            member this.GetAlreadyExecuted() = getAlreadyExecuted createCommand (fun() -> assertVersioningTableExists createCommand sqlExecuter):> seq<ScriptName>
+            member this.GetAlreadyExecuted() = getAlreadyExecuted sqlExecuter createCommand (fun() -> assertVersioningTableExists createCommand sqlExecuter):> seq<ScriptName>
             member this.ExecuteScript(toExecute, comment) = sqlExecuter toExecute comment
             member this.RegisterExecuted(scriptSpec, signature) = registerCreated sqlExecuter scriptSpec signature
             member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec

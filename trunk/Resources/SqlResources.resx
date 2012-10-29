@@ -121,4 +121,10 @@
   <data name="CreateDbVersionHistory" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>CreateDbVersionHistory.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
+  <data name="RemapScriptVersion" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>RemapScriptVersion.Sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
+  <data name="RemoveForeginKey" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>RemoveForeginKey.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
 </root>

@@ -40,12 +40,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="RemoveForeginKey.sql" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SqlResources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>SqlResources.resx</DependentUpon>
     </Compile>
+    <Content Include="RemapScriptVersion.Sql" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="SqlResources.resx">
