@@ -42,6 +42,7 @@
     <Compile Include="Test.fs" />
     <Compile Include="MockExtensions.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Remap.fs" />
     <Compile Include="DbScriptRepository.fs" />
     <Compile Include="SqlServerSpecific.fs" />
     <Compile Include="DbVersioner.fs" />

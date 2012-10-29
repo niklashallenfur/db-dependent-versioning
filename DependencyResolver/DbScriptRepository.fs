@@ -6,7 +6,7 @@ open System.Text.RegularExpressions
 open System.Text
 open Diffluxum.DbVersioning.Types
 
-type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, logger : ILogger) =    
+type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, logger : ILogger, remapModuleName : (int list -> int list)) =    
     let getScriptDependency moduleFile =
         let dependsOnRegex = @"\s*--\s*//@DEPENDSON\s*=\s*(?<dependsOnScript>[\d\.]+)\s*"
         let firstLine =
@@ -16,7 +16,7 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
         let rm = Regex.Match(firstLine, dependsOnRegex)
         match rm.Success with
         | false -> None 
-        | true -> Some(ScriptName.Parse(rm.Groups.Item("dependsOnScript").Value))
+        | true -> Some(ScriptName.Parse (rm.Groups.Item("dependsOnScript").Value) |> fun x -> {x with Module = remapModuleName x.Module}) 
 
     let getModuleScript moduleName moduleFile =
         let fileName = Path.GetFileNameWithoutExtension(moduleFile)
@@ -38,9 +38,10 @@ type FileScriptRepository (baseDir, moduleDirRegex, moduleNameSeparator : char, 
         match rm.Success with
             |false -> failwithf "the module directory name '%s' does not match the required format of '%s'" dirName moduleDirRegex
             |true ->
-                let matched =  rm.Groups.Item("moduleName").Value
+                // TODO: Must remap here!
+                let matched = rm.Groups.Item("moduleName").Value
                 let moduleNameParts = matched.Split([|moduleNameSeparator|], StringSplitOptions.RemoveEmptyEntries)
-                let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray
+                let moduleName = moduleNameParts |> Array.map (Int32.Parse) |> List.ofArray |> remapModuleName
                 moduleName
 
     let hasContent (path : string) =
