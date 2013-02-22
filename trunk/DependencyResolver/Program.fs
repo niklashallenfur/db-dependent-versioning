@@ -9,30 +9,57 @@ open System.IO
 open System.Text
 
 
-let tempColor color = let oldCol = Console.ForegroundColor
-                      Console.ForegroundColor <- color
-                      {new IDisposable with member this.Dispose() = Console.ForegroundColor <- oldCol}
+let printUsage()=
+    Console.WriteLine "Usage:"
+    Console.WriteLine "DbVersioner.exe /ConnectionString=<cs> /ScriptDirectory=<sd> /Signature=<sign> [/SqlOutputFile=<sqlFile>] [/ModuleDirRegex=<regEx>] [/ModuleNameSeparator=<separator>] [/ScriptNameRemap=<map>] [/?] [/help]" 
+
+let getOrDefault key def map =
+    match Map.tryFind key map with
+    |Some(x) -> x
+    |None -> def
 
 
-let consoleLogger = ConsoleLogger()
+[<EntryPoint>]
+let main args =       
+    let argDict =               
+            args
+                |> Seq.ofArray
+                |> Seq.map (fun x ->
+                    let parts = x.Split('=')
+                    (parts.[0].Trim('/'), String.Join("=", Seq.skip 1 (Seq.ofArray parts)).Trim()))
+                |> Map.ofSeq
 
+    let (connStr, baseDir, signature) =
+        try    
+            (Map.find "ConnectionString" argDict,
+             Map.find "ScriptDirectory" argDict,
+             Map.find "Signature" argDict )   
+        with
+            _ ->
+                printUsage();
+                failwith "Invalid Usage"
 
+    let moduleDirRegex = getOrDefault "ModuleDirRegex" @"[a-zA-Z]*(?<moduleName>[\d\._]+).*" argDict
+    let moduleNameSeparator = (getOrDefault "ModuleNameSeparator" "_" argDict).[0]
+    let scriptNameRemap = getOrDefault "ScriptNameRemap" "" argDict
+    
+    // Initialize logfile, if used
+    let (sqlOutput, outputFileDisposable) =
+        let sqlOutFile = getOrDefault "SqlOutputFile" "" argDict
+        match String.IsNullOrEmpty(sqlOutFile) with
+        |true -> (None, {new IDisposable with member x.Dispose() = ignore()})
+        |false ->   let fileLogger = new FileLogger(sqlOutFile)
+                    (Some(fileLogger :> Diffluxum.DbVersioning.Types.ILogger), fileLogger :> IDisposable)
+    use d = outputFileDisposable
+    let logger = ConsoleLogger()
 
-let moduleDirRegex = @"[a-zA-Z]*(?<moduleName>[\d\._]+).*"
-let moduleNameSeparator = '_'
-let connString = @"Data Source=localhost;UID=cwo;PWD=cwo;Initial Catalog=SOV;"
-let baseDir = @"E:\caletfs\Trunk\Database\CwoDB\Change Scripts"
+    let remapModuleName = Diffluxum.DbVersioning.Remap.createRemappings scriptNameRemap
 
+    let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
+    let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger, remapModuleName) :> IScriptRepository
 
-let fileLogger = new FileLogger(@"e:\temp\diffscript.sql")
-
-let moduleNameMapper = Diffluxum.DbVersioning.Remap.createRemappings "2.11:0.2.11, 2.12:0.2.12, 2.13:0.2.13, 2.14:0.2.14, 2.15:0.2.15"
-
-let connectionCreator = SqlConnectionFactory(connString, consoleLogger, None, moduleNameMapper) :> IConnectionResourceProvider
-let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, consoleLogger, moduleNameMapper) :> IScriptRepository
-
-let versioner = DbVersioner(connectionCreator, scriptRepository, consoleLogger,moduleNameMapper)
-versioner.DownGradeUpGrade(false,"","", "nikhal manual history update")
-(fileLogger :> IDisposable).Dispose()
-
-System.Console.ReadKey() |> ignore
+    let versioner = new DbVersioner(connectionCreator, scriptRepository, logger, remapModuleName)    
+    versioner.DownGradeUpGrade(false, "", "", signature)
+    
+    // Return 0. This indicates success.    
+    0
