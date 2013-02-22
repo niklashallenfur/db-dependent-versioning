@@ -13,6 +13,3 @@
 ) ON [PRIMARY]
 
 GO
-
-ALTER TABLE [dbo].[DbVersioningHistory] CHECK CONSTRAINT [FK_DbVersioningHistory_DbVersioningHistory]
-GO
