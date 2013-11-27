@@ -45,10 +45,14 @@ type ApplyUndoScript = {
     IsEmpty : bool;
     }
 
-type IConnectionResource =
+type ITransaction = 
     inherit IDisposable
-    abstract ExecuteScript : string * string option -> unit
     abstract Commit : unit -> unit
+
+type IConnectionResource =
+    inherit IDisposable    
+    abstract ExecuteScript : string * string option -> unit
+    abstract BeginTransaction : unit -> ITransaction
     abstract GetAlreadyExecuted : unit -> seq<ScriptName>
     abstract RegisterExecuted : DbScriptSpec * string -> unit
     abstract UnRegisterExecuted : DbScriptSpec -> unit

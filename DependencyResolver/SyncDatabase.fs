@@ -19,11 +19,12 @@ type SyncDatabase() =
     let mutable outputFile = ""
     let mutable testUndo = true
     let mutable scriptNameRemap = ""
-
-
+    
     let mutable downBelowVersion = ""
     let mutable upToVersion = ""
     let mutable signature = ""
+
+    let mutable commandTimeout = 3600
 
     let getImportance importance = 
         match importance with
@@ -42,6 +43,7 @@ type SyncDatabase() =
     member this.ModuleDirRegex  with get() = moduleDirRegex and set (value) = moduleDirRegex <- value
     member this.ModuleNameSeparator with get() = moduleNameSeparator  and set (value) = moduleNameSeparator <- value
     member this.ScriptNameRemap with get() = scriptNameRemap  and set (value) = scriptNameRemap <- value
+    member this.CommandTimeout with get() = commandTimeout  and set (value) = commandTimeout <- value
 
     override this.Execute() =
         let logger = {new Diffluxum.DbVersioning.Types.ILogger with 
@@ -58,7 +60,7 @@ type SyncDatabase() =
 
         let remapModuleName = Diffluxum.DbVersioning.Remap.createRemappings scriptNameRemap
 
-        let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
+        let connectionCreator = SqlConnectionFactory(commandTimeout, connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
         let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger, remapModuleName) :> IScriptRepository
 
         let versioner = new DbVersioner(connectionCreator, scriptRepository, logger, remapModuleName)    

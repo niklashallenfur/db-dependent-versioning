@@ -5,6 +5,7 @@ open Diffluxum.DbVersioning.Types
 open System
 open System.IO
 open System.Text
+open System.Transactions
 
 type FileLogger(file) =
     let textBuilder = StringBuilder()
@@ -63,8 +64,10 @@ type DbVersioner(
         let message = sprintf "Applying %s" (spec.Name.ToString())
         logger.LogMessage(message, LogImportance.High)
         if not applyUndo.IsEmpty then do
+            use scope = connection.BeginTransaction()
             connection.ExecuteScript (applyUndo.ApplyScript, Some(message))
-            connection.RegisterExecuted (spec,signature)        
+            connection.RegisterExecuted (spec,signature)
+            scope.Commit()
         else do
             logger.LogMessage(sprintf "Skipped %s as it is an empty script" (spec.Name.ToString()), LogImportance.High)
 
@@ -72,8 +75,10 @@ type DbVersioner(
         let applyUndo = (scriptLoader spec)
         let message = sprintf "Undoing %s" (spec.Name.ToString())
         logger.LogMessage(message, LogImportance.High)
+        use scope = connection.BeginTransaction()
         connection.ExecuteScript (applyUndo.UndoScript, Some(message))
         connection.UnRegisterExecuted spec
+        scope.Commit()
 
     let lastItem sequence =
         let folder acc item =
@@ -166,7 +171,6 @@ type DbVersioner(
         use connection = connectionCreator.CreateConnection()
         x.DownGrade(belowVersion, connection)
         x.Upgrade(testUndo, toVersion, connection, signature)
-        connection.Commit()
 
 
 open NUnit.Framework

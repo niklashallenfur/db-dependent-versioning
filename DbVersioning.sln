@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DependencyResolver", "DependencyResolver\DependencyResolver.fsproj", "{3095F3EF-CC51-45AD-AF54-C5898E5C227A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console", "Console\Console.csproj", "{CE6DA569-1D17-410D-B752-6AF4BA24F22B}"
