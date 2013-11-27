@@ -55,7 +55,7 @@ let main args =
 
     let remapModuleName = Diffluxum.DbVersioning.Remap.createRemappings scriptNameRemap
 
-    let connectionCreator = SqlConnectionFactory(connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
+    let connectionCreator = SqlConnectionFactory(3600, connStr, logger, sqlOutput, remapModuleName) :> IConnectionResourceProvider
     let scriptRepository = FileScriptRepository(baseDir, moduleDirRegex, moduleNameSeparator, logger, remapModuleName) :> IScriptRepository
 
     let versioner = new DbVersioner(connectionCreator, scriptRepository, logger, remapModuleName)    

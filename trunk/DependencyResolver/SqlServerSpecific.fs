@@ -6,7 +6,9 @@ open System.Transactions
 open Diffluxum.DbVersioning.Types
 open Diffluxum.DbVersioning.Resources
 
-type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option, remapModuleName : (int list -> int list)) =
+type SqlConnectionFactory (commandTimeout, connStr, logger : ILogger, sqlOutput : ILogger option, remapModuleName : (int list -> int list)) =
+
+    let mutable transactionScope : SqlTransaction option = None
 
     let mergeComment script comment =
         match comment with
@@ -70,27 +72,45 @@ type SqlConnectionFactory (connStr, logger : ILogger, sqlOutput : ILogger option
             let unregisterScript = sprintf "DELETE FROM DbVersioningHistory WHERE ScriptVersion='%s'" (script.Name.ToString())
             sqlExecuter unregisterScript (Some(sprintf "Unregistering %s as applied" (script.Name.ToString())))
 
+                           
+
     let createSqlConnection connStr = 
         let conn = new SqlConnection(connStr)
-        let trans = conn.Open()
-                    conn.BeginTransaction(Data.IsolationLevel.ReadCommitted)
+        conn.Open()
+//        let trans = conn.Open()
+//                    conn.BeginTransaction(Data.IsolationLevel.ReadCommitted)
         
-        let createCommand commandText = let cmd = new SqlCommand(commandText, conn, trans)
-                                        cmd.CommandTimeout <- 3600
+        let createCommand commandText = let cmd = new SqlCommand(commandText, conn)
+                                        cmd.CommandTimeout <- commandTimeout
+                                        match transactionScope with
+                                        | Some(x) -> cmd.Transaction <- x
+                                        | None -> ignore()
                                         cmd
+
+        let beginTransaction() =
+            match transactionScope with
+            | Some(x) -> failwith "Transaction already started"
+            | None ->
+                let trans = conn.BeginTransaction()
+                transactionScope <- Some(trans)
+                {new ITransaction with
+                    member this.Dispose() =
+                        trans.Dispose()
+                        transactionScope <- None
+                    member this.Commit() = trans.Commit()}
+
         let sqlExecuter =
             match sqlOutput with
             | None -> executeSql createCommand
             | Some(output) -> fun script comment -> output.LogMessage(mergeComment script comment, LogImportance.Low)
          
         {new IConnectionResource with
+            member this.BeginTransaction() = beginTransaction()
             member this.GetAlreadyExecuted() = getAlreadyExecuted sqlExecuter createCommand (fun() -> assertVersioningTableExists createCommand sqlExecuter):> seq<ScriptName>
             member this.ExecuteScript(toExecute, comment) = sqlExecuter toExecute comment
             member this.RegisterExecuted(scriptSpec, signature) = registerCreated sqlExecuter scriptSpec signature
-            member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec
-            member this.Commit() = trans.Commit()
-            member this.Dispose() = trans.Dispose()
-                                    conn.Dispose()}
+            member this.UnRegisterExecuted(scriptSpec) = unRegisterCreated sqlExecuter scriptSpec            
+            member this.Dispose() = conn.Dispose()}
 
     interface IConnectionResourceProvider with
         member this.CreateConnection() = createSqlConnection connStr
