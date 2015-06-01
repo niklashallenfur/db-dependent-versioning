@@ -1,0 +1,1 @@
+Inspired by the database versioning tool DbDeploy, but adjusted to suit more to-the-point needs
